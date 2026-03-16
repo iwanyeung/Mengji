@@ -83,6 +83,53 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #7A7585;
         }
+
+        /* Mengji bottom tab bar */
+        .mj-tabbar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 40;
+            background: rgba(13, 12, 15, 0.96);
+            border-top: 1px solid rgba(122, 117, 133, 0.4);
+            backdrop-filter: blur(18px);
+        }
+
+        .mj-tabbar-inner {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 8px 16px 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .mj-tab {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 2px;
+            color: #7A7585;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .mj-tab-icon {
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        .mj-tab.mj-tab--active {
+            color: #D4FF33;
+        }
     </style>
 <style>
     body {
@@ -90,7 +137,7 @@
     }
   </style>
   </head>
-<body class="bg-background-dark text-text-main antialiased relative min-h-screen pb-24">
+<body class="bg-background-dark text-text-main antialiased relative min-h-screen pb-32">
 <!-- Grainy Noise Overlay -->
 <div class="noise-overlay"></div>
 <main class="relative flex min-h-screen w-full flex-col max-w-md mx-auto md:max-w-2xl lg:max-w-4xl px-6 pt-12">
@@ -165,18 +212,44 @@
 </div>
 </div>
 </main>
-<!-- Fixed Bottom Action Button -->
-<div class="fixed bottom-0 left-0 w-full z-50 p-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent">
+<!-- Fixed Bottom Action Button + Tab Bar padding -->
+<div class="fixed bottom-16 left-0 w-full z-40 p-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent">
 <div class="max-w-md mx-auto md:max-w-2xl lg:max-w-4xl relative">
-<!-- Glitch decorative elements -->
 <div class="absolute -top-1 left-4 w-12 h-[1px] bg-primary"></div>
 <div class="absolute -top-2 right-8 w-4 h-[1px] bg-accent"></div>
 <button class="w-full h-16 bg-primary text-background-dark font-display font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white transition-colors group relative overflow-hidden rounded-full shadow-[0_0_20px_rgba(212,255,51,0.15)] hover:shadow-[0_0_30px_rgba(212,255,51,0.3)]">
 <span class="material-symbols-outlined text-xl group-hover:rotate-12 transition-transform">visibility</span>
-                Manifest Vision <span class="text-xs opacity-70 font-normal ml-1 border border-background-dark/30 px-2 py-0.5 rounded-pill">(Premium)</span>
-<!-- Hover scanline effect -->
+                显化为四格漫画<span class="text-xs opacity-70 font-normal ml-1 border border-background-dark/30 px-2 py-0.5 rounded-pill">（付费）</span>
 <div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/20 to-transparent -translate-y-full group-hover:translate-y-full transition-transform duration-700 ease-in-out"></div>
 </button>
 </div>
+</div>
+<div class="mj-tabbar">
+  <div class="mj-tabbar-inner">
+    <a class="mj-tab" href="../_1/1-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">mic</span>
+      </div>
+      <span>录梦</span>
+    </a>
+    <a class="mj-tab mj-tab--active" href="../_2/2-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">auto_awesome</span>
+      </div>
+      <span>梦析</span>
+    </a>
+    <a class="mj-tab" href="../_3/3-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">image</span>
+      </div>
+      <span>显化工坊</span>
+    </a>
+    <a class="mj-tab" href="../_4/4-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">inventory_2</span>
+      </div>
+      <span>潜意识星图</span>
+    </a>
+  </div>
 </div>
 </body></html>

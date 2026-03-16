@@ -88,6 +88,53 @@
         .fragments-list::-webkit-scrollbar-thumb {
             background: #7A7585;
         }
+
+        /* Mengji bottom tab bar */
+        .mj-tabbar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 40;
+            background: rgba(13, 12, 15, 0.96);
+            border-top: 1px solid rgba(122, 117, 133, 0.4);
+            backdrop-filter: blur(18px);
+        }
+
+        .mj-tabbar-inner {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 8px 16px 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .mj-tab {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 2px;
+            color: #7A7585;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .mj-tab-icon {
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        .mj-tab.mj-tab--active {
+            color: #D4FF33;
+        }
     </style>
 <style>
     body {
@@ -101,7 +148,7 @@
 <!-- Oversized Bleeding Header -->
 <h1 class="bleeding-text">Tell Me</h1>
 <!-- Main Content Area -->
-<main class="h-full w-full flex flex-col justify-end pb-32 px-6 relative z-20">
+<main class="h-full w-full flex flex-col justify-end pb-40 px-6 relative z-20">
 <!-- Recent Fragments List (Asymmetrical, Left-aligned) -->
 <div class="flex flex-col gap-8 max-w-[60%] fragments-list overflow-y-auto max-h-[60vh] pb-10">
 <!-- Fragment 1 -->
@@ -152,13 +199,41 @@
         </div> 
         -->
 </main>
-<!-- Recording Orb (Offset Bottom-Right) -->
-<div class="absolute bottom-[40px] right-[20px] z-30 flex flex-col items-center gap-2">
+<!-- Recording Orb (Offset Bottom-Right, above TabBar) -->
+<div class="absolute bottom-[120px] right-[20px] z-30 flex flex-col items-center gap-2">
 <span class="text-primary text-[10px] uppercase tracking-[0.2em] font-bold animate-pulse mb-2">Hold to Record</span>
 <button class="w-[120px] h-[120px] bg-primary rounded-full flex items-center justify-center orb-glow cursor-pointer select-none">
 <span class="material-symbols-outlined text-background-dark text-[48px]">
                 mic
             </span>
 </button>
+</div>
+<div class="mj-tabbar">
+  <div class="mj-tabbar-inner">
+    <a class="mj-tab mj-tab--active" href="../_1/1-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">mic</span>
+      </div>
+      <span>录梦</span>
+    </a>
+    <a class="mj-tab" href="../_2/2-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">auto_awesome</span>
+      </div>
+      <span>梦析</span>
+    </a>
+    <a class="mj-tab" href="../_3/3-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">image</span>
+      </div>
+      <span>显化工坊</span>
+    </a>
+    <a class="mj-tab" href="../_4/4-code.html">
+      <div class="mj-tab-icon">
+        <span class="material-symbols-outlined text-[24px]">inventory_2</span>
+      </div>
+      <span>潜意识星图</span>
+    </a>
+  </div>
 </div>
 </body></html>

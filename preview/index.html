@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>梦悸 MVP 浏览器预览</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --color-primary: #d4ff33;
+        --color-background: #0d0c0f;
+        --color-surface: #1e1a25;
+        --color-text: #f4f0eb;
+        --color-muted: #7a7585;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: radial-gradient(circle at top, #221b2c 0, #0d0c0f 45%);
+        color: var(--color-text);
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .shell {
+        width: min(420px, 100vw - 32px);
+        height: min(820px, 100vh - 32px);
+        border: 1px solid rgba(244, 240, 235, 0.25);
+        background: linear-gradient(145deg, #18131f, #08070a);
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.9),
+          0 32px 80px rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        border-bottom: 1px solid rgba(122, 117, 133, 0.4);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--color-muted);
+      }
+
+      .title {
+        font-weight: 600;
+        color: var(--color-text);
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-bottom: 1px solid rgba(122, 117, 133, 0.4);
+      }
+
+      .tab {
+        padding: 8px 0;
+        font-size: 11px;
+        text-align: center;
+        cursor: pointer;
+        border-right: 1px solid rgba(122, 117, 133, 0.3);
+        color: var(--color-muted);
+        background: transparent;
+        outline: none;
+        border-top: none;
+        border-left: none;
+        border-bottom: none;
+        text-transform: none;
+      }
+
+      .tab:last-child {
+        border-right: none;
+      }
+
+      .tab.active {
+        color: var(--color-background);
+        background: var(--color-primary);
+        font-weight: 600;
+      }
+
+      .frame {
+        flex: 1;
+        background: #000;
+        border-top: 1px solid #000;
+      }
+
+      .frame iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #000;
+      }
+
+      .hint {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 10px;
+        color: rgba(244, 240, 235, 0.55);
+        text-align: center;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="top-bar">
+        <span class="title">梦悸 · MVP 预览</span>
+        <span>HTML PROTOTYPE</span>
+      </div>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-src="../MVP/_1/1-code.html">录梦</button>
+        <button class="tab" data-src="../MVP/_2/2-code.html">梦析</button>
+        <button class="tab" data-src="../MVP/_3/3-code.html">显化工坊</button>
+        <button class="tab" data-src="../MVP/_4/4-code.html">潜意识星图</button>
+      </div>
+      <div class="frame">
+        <iframe
+          id="preview-frame"
+          src="../MVP/_1/1-code.html"
+          title="梦悸 原型预览"
+        ></iframe>
+      </div>
+      <div class="hint">
+        在 Cursor 中编辑对应的 HTML 文件后，保存并刷新浏览器即可看到最新效果。
+      </div>
+    </div>
+    <script>
+      const tabs = document.querySelectorAll('.tab');
+      const frame = document.getElementById('preview-frame');
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tabs.forEach((t) => t.classList.remove('active'));
+          tab.classList.add('active');
+          const src = tab.getAttribute('data-src');
+          if (src) {
+            frame.setAttribute('src', src);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
+
