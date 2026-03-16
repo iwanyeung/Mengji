@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>边界 (高级版)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#cdf53d",
+              "background-light": "#f8f8f5",
+              "background-dark": "#0D0C0F",
+              "surface": "#1E1A25",
+              "text-light": "#F4F0EB",
+              "muted": "#7A7585",
+              "accent": "#FF3366"
+            },
+            fontFamily: {
+              "display": ["Space Grotesk", "sans-serif"],
+              "serif": ["Bodoni Moda", "serif"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+            letterSpacing: {
+              "tightest": "-0.05em",
+              "widest": "0.1em"
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background-dark');
+            color: theme('colors.text-light');
+            font-family: theme('fontFamily.display');
+            overflow-x: hidden;
+        }
+        
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .text-outline {
+            -webkit-text-stroke: 1px theme('colors.primary');
+            color: transparent;
+        }
+        
+        .glow-effect {
+            box-shadow: 0 0 30px -10px theme('colors.primary');
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark min-h-screen relative flex flex-col justify-between selection:bg-primary selection:text-background-dark">
+<div class="noise-overlay"></div>
+<!-- Top Navigation / Dismiss -->
+<div class="flex items-center justify-between p-6 z-20 relative">
+<button aria-label="Return to the Void" class="text-muted hover:text-text-light transition-colors group flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl group-hover:-translate-x-1 transition-transform">west</span>
+<span class="text-xs tracking-widest uppercase font-semibold">Return</span>
+</button>
+<div class="text-primary text-xs tracking-widest uppercase font-semibold border border-primary px-3 py-1 rounded-full">
+            Premium
+        </div>
+</div>
+<!-- Hero Graphic & Bleeding Typography -->
+<main class="flex-1 relative z-10 flex flex-col justify-center px-6 -mt-12">
+<!-- Surreal Background Element -->
+<div class="absolute top-0 right-0 w-3/4 h-3/4 bg-gradient-to-bl from-primary/20 via-surface/40 to-transparent blur-3xl -z-10 rounded-full mix-blend-screen opacity-60"></div>
+<div class="absolute bottom-1/4 left-[-10%] w-1/2 h-1/2 bg-gradient-to-tr from-accent/20 to-transparent blur-3xl -z-10 rounded-full mix-blend-screen opacity-40"></div>
+<div class="relative mb-8">
+<h1 aria-hidden="true" class="font-serif italic text-6xl md:text-8xl leading-none tracking-tightest whitespace-nowrap absolute -top-12 -left-8 opacity-20 text-outline select-none">
+                MANIFEST
+            </h1>
+<h1 class="font-serif text-5xl md:text-7xl leading-[0.9] tracking-tightest text-text-light relative z-10 break-words max-w-[90%]">
+                CROSS THE<br/>
+<span class="italic text-primary">BOUNDARY.</span>
+</h1>
+</div>
+<p class="text-lg text-text-light/80 leading-[1.6] max-w-md mb-12 font-light">
+            Your subconscious demands to be seen. Unlock the AI visual engine and materialize your dreams before they fade into the void.
+        </p>
+<!-- Feature Pills -->
+<div class="space-y-4 mb-24 max-w-sm">
+<div class="flex items-center gap-4 bg-surface/50 border border-primary/30 backdrop-blur-sm rounded-full p-2 pr-6 transform -rotate-1 hover:border-primary transition-colors hover:bg-surface duration-300">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-xl">visibility</span>
+</div>
+<span class="text-sm font-medium tracking-wide">Infinite Visual Manifestations</span>
+</div>
+<div class="flex items-center gap-4 bg-surface/50 border border-primary/30 backdrop-blur-sm rounded-full p-2 pr-6 transform translate-x-4 rotate-1 hover:border-primary transition-colors hover:bg-surface duration-300">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-xl">view_cozy</span>
+</div>
+<span class="text-sm font-medium tracking-wide">Surreal 4-Panel Comics</span>
+</div>
+<div class="flex items-center gap-4 bg-surface/50 border border-primary/30 backdrop-blur-sm rounded-full p-2 pr-6 transform -translate-x-2 -rotate-2 hover:border-primary transition-colors hover:bg-surface duration-300">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-xl">all_inclusive</span>
+</div>
+<span class="text-sm font-medium tracking-wide">Unrestricted Archive Access</span>
+</div>
+</div>
+</main>
+<!-- Sticky Bottom CTA -->
+<div class="fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t from-background-dark via-background-dark/90 to-transparent z-30 pb-10">
+<button class="w-full bg-primary text-background-dark rounded-full py-5 px-8 flex flex-col items-center justify-center group relative overflow-hidden glow-effect transition-transform active:scale-95">
+<!-- Button Hover/Active background effect -->
+<div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+<span class="text-lg font-bold tracking-widest uppercase relative z-10 flex items-center gap-2">
+                Unlock Manifestation
+                <span class="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</span>
+<span class="text-xs font-medium opacity-70 mt-1 relative z-10 tracking-wide uppercase">
+                $4.99 / Month • Cancel Anytime
+            </span>
+</button>
+<div class="text-center mt-4">
+<a class="text-xs text-muted hover:text-text-light transition-colors underline underline-offset-4 tracking-wide" href="#">Restore Purchases</a>
+</div>
+</div>
+</body></html>

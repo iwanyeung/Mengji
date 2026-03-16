@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Void - Dream Catcher</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#cdf53d",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#0D0C0F",
+                        "surface": "#1E1A25",
+                        "text-main": "#F4F0EB",
+                        "muted": "#7A7585",
+                        "accent": "#FF3366"
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "serif": ["Bodoni Moda", "serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #0D0C0F;
+            color: #F4F0EB;
+            overflow: hidden; /* Prevent scrolling for the full-screen void feel */
+        }
+        
+        /* Grain noise overlay */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Bleeding Typography */
+        .bleeding-text {
+            font-family: 'Bodoni Moda', serif;
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.05em;
+            position: absolute;
+            top: -10px;
+            left: -15px;
+            white-space: nowrap;
+            color: #F4F0EB;
+            z-index: 20;
+        }
+
+        /* Recording Orb Glow */
+        .orb-glow {
+            box-shadow: 0 0 20px #cdf53d;
+            transition: all 0.3s ease;
+        }
+        
+        .orb-glow:active {
+            box-shadow: 0 0 40px #FF3366;
+            background-color: #FF3366;
+            transform: scale(1.1);
+        }
+
+        /* Custom Scrollbar for fragments if needed */
+        .fragments-list::-webkit-scrollbar {
+            width: 2px;
+        }
+        .fragments-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .fragments-list::-webkit-scrollbar-thumb {
+            background: #7A7585;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark h-screen w-screen relative">
+<!-- Static Grain Overlay -->
+<div class="noise-overlay"></div>
+<!-- Oversized Bleeding Header -->
+<h1 class="bleeding-text">Tell Me</h1>
+<!-- Main Content Area -->
+<main class="h-full w-full flex flex-col justify-end pb-32 px-6 relative z-20">
+<!-- Recent Fragments List (Asymmetrical, Left-aligned) -->
+<div class="flex flex-col gap-8 max-w-[60%] fragments-list overflow-y-auto max-h-[60vh] pb-10">
+<!-- Fragment 1 -->
+<div class="group cursor-pointer">
+<p class="text-text-main text-lg font-normal leading-[1.6] mb-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                    Falling through the clocktower...
+                </p>
+<div class="flex items-center gap-2">
+<span class="w-4 h-[1px] bg-primary"></span>
+<p class="text-muted text-[12px] font-semibold uppercase tracking-[0.1em]">Oct 24 • 03:14 AM</p>
+</div>
+</div>
+<!-- Fragment 2 -->
+<div class="group cursor-pointer">
+<p class="text-text-main text-lg font-normal leading-[1.6] mb-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    Teeth shattering into glass, reflecting the crimson sky.
+                </p>
+<div class="flex items-center gap-2">
+<span class="w-4 h-[1px] bg-primary"></span>
+<p class="text-muted text-[12px] font-semibold uppercase tracking-[0.1em]">Oct 22 • 05:02 AM</p>
+</div>
+</div>
+<!-- Fragment 3 -->
+<div class="group cursor-pointer">
+<p class="text-text-main text-lg font-normal leading-[1.6] mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    An endless corridor of mirrored doors.
+                </p>
+<div class="flex items-center gap-2">
+<span class="w-4 h-[1px] bg-primary"></span>
+<p class="text-muted text-[12px] font-semibold uppercase tracking-[0.1em]">Oct 19 • 02:45 AM</p>
+</div>
+</div>
+<!-- Fragment 4 (Faded out to imply more) -->
+<div class="group cursor-pointer">
+<p class="text-text-main text-lg font-normal leading-[1.6] mb-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                    Whispers from the sunken ship...
+                </p>
+<div class="flex items-center gap-2 opacity-50">
+<span class="w-4 h-[1px] bg-primary"></span>
+<p class="text-muted text-[12px] font-semibold uppercase tracking-[0.1em]">Oct 15 • 04:20 AM</p>
+</div>
+</div>
+</div>
+<!-- Empty State (Hidden by default, shown here for structure if needed) -->
+<!-- 
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <p class="text-muted text-lg font-serif italic">No dreams. Only sleep.</p>
+        </div> 
+        -->
+</main>
+<!-- Recording Orb (Offset Bottom-Right) -->
+<div class="absolute bottom-[40px] right-[20px] z-30 flex flex-col items-center gap-2">
+<span class="text-primary text-[10px] uppercase tracking-[0.2em] font-bold animate-pulse mb-2">Hold to Record</span>
+<button class="w-[120px] h-[120px] bg-primary rounded-full flex items-center justify-center orb-glow cursor-pointer select-none">
+<span class="material-symbols-outlined text-background-dark text-[48px]">
+                mic
+            </span>
+</button>
+</div>
+</body></html>

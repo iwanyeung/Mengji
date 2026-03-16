@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>显化 (视觉) - Surreal Dream Catcher</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4FF33", // Acid Yellow
+                        "background-light": "#0D0C0F", // Forced dark for this theme
+                        "background-dark": "#0D0C0F", // Pitch Black
+                        "surface": "#1E1A25", // Deep Purple
+                        "text-main": "#F4F0EB", // Bone White
+                        "muted": "#7A7585", // Ash
+                        "accent": "#FF3366", // Psychedelic Pink
+                    },
+                    fontFamily: {
+                        "display": ["'Bodoni Moda'", "serif"],
+                        "body": ["'Space Grotesk'", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"}, // Brutalist 0px default
+                    letterSpacing: {
+                        "tightest": "-0.05em",
+                        "widest": "0.1em",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom utilities for the surreal aesthetic */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+        
+        .halftone-effect {
+            filter: contrast(1.5) grayscale(1);
+            mix-blend-mode: hard-light;
+        }
+
+        /* Hide scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* Masonry Grid Setup */
+        .masonry-grid {
+            column-count: 1;
+            column-gap: 0;
+        }
+        @media (min-width: 640px) {
+            .masonry-grid {
+                column-count: 2;
+            }
+        }
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 0;
+            display: block;
+            width: 100%;
+            position: relative;
+        }
+        
+        /* Image aspect ratios to force staggered look */
+        .ratio-1-1 { aspect-ratio: 1 / 1; }
+        .ratio-4-5 { aspect-ratio: 4 / 5; }
+        .ratio-16-9 { aspect-ratio: 16 / 9; }
+        .ratio-9-16 { aspect-ratio: 9 / 16; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark text-text-main font-body antialiased min-h-screen relative overflow-x-hidden selection:bg-primary selection:text-background-dark">
+<div class="noise-overlay"></div>
+<!-- Fixed Share Button -->
+<div class="fixed top-6 right-6 z-40">
+<button aria-label="Share Manifestation" class="w-12 h-12 bg-background-dark flex items-center justify-center border border-primary text-text-main hover:bg-primary hover:text-background-dark transition-colors duration-300">
+<span class="material-symbols-outlined text-2xl">share</span>
+</button>
+</div>
+<!-- Main Content Area -->
+<main class="w-full max-w-5xl mx-auto pb-24 relative">
+<!-- Floating Title Block Overlapping First Image -->
+<header class="absolute top-12 left-6 z-30 max-w-[80%] pointer-events-none mix-blend-difference text-primary">
+<p class="font-body text-xs font-semibold uppercase tracking-widest mb-2 text-primary">Manifestation</p>
+<h1 class="font-display italic text-5xl md:text-7xl font-bold leading-none tracking-tightest">
+                Teeth &amp;<br/>Falling
+            </h1>
+<p class="font-body text-sm mt-4 text-primary opacity-80">Vol. 4 // Subconscious Archive</p>
+</header>
+<!-- Full-Bleed Masonry Grid -->
+<div class="masonry-grid w-full">
+<!-- Pane 1: Hero / Abstract -->
+<div class="masonry-item ratio-4-5 bg-surface group cursor-pointer overflow-hidden relative">
+<img alt="Abstract liquid distortion pattern" class="w-full h-full object-cover halftone-effect group-hover:scale-105 transition-transform duration-700 ease-out" data-alt="Abstract liquid distortion pattern" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBL89CPva_GggE0j9nYthcjAhfauzQJt_9OhFmVMnL3PEkJ7Qx-yiT2lw6s_uFbf8XNBQju_73bvEzHLZK0Fv7oql3HQKeoacOUPIUssR2WQm0fezQNvlSIg-BiBirPWjpnrmzqXUtESrOtYQSBjI7rzUB5p9MroV9wWBlvF5pvTkfZ6mEDynKCNAT3KVbSTdz976rKzDzDVe0I827l1gD5_TG7K-r8IWEwRninl7pYP1uEBOtc8TMvE1n8xjzIiYvYZPni_MtpZGQ"/>
+<div class="absolute bottom-4 right-4 bg-background-dark text-primary font-body text-[10px] uppercase tracking-widest px-2 py-1 border border-primary">
+                    Pane 01
+                </div>
+</div>
+<!-- Pane 2: Surreal Object -->
+<div class="masonry-item ratio-1-1 bg-surface group cursor-pointer overflow-hidden relative">
+<img alt="High contrast geometric shapes" class="w-full h-full object-cover halftone-effect group-hover:scale-105 transition-transform duration-700 ease-out" data-alt="High contrast geometric shapes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9z0BDgxNjjmRvshSCehfMuBRTPeGkkbO6qv7blnDelNjiAO9jRg99hntW61BjZJFi-AOH4wrnd4o5Ugkjp8dCdXTXarZ6_zdFADzc9ZRhpunKGz3CwGQpWTMcBnvwk2-DelavRrt-fLsmxS6zVrgsebHj_T9f-2JPbD2cPhOQwdYYeh6_uJ0ZZwZWP7Wh2Nf7l32nl5I_m5j0gbK2ypv4bgN2b1oi7M2OZW-QbY7Bdy6SYElZOxt3McO_aj3_tuSmQVnoRdsBx2g"/>
+<div class="absolute top-0 left-0 w-full h-full bg-accent mix-blend-overlay opacity-20"></div>
+</div>
+<!-- Pane 3: Landscape / Wide -->
+<div class="masonry-item ratio-16-9 bg-surface group cursor-pointer overflow-hidden relative">
+<img alt="Dark textured background with light streak" class="w-full h-full object-cover halftone-effect group-hover:scale-105 transition-transform duration-700 ease-out" data-alt="Dark textured background with light streak" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQ9MsFkLZjIliYmyrhQ2CdKmAXGXGSApWT8eCmvJ6iBmXApO1T6KAljXMZdgJiujCP67E_HWBGqDuisKYSW17mp3f9O5QwOysHVcdXf9t7oWKY7a63dfLQ4iKmd5fDAMxr373JGAG9THT-1Dmupjqbe9iI5-H9E0b7xuLXxowwJR0sBxSa4LXWN4Cge6ArV5K6PdOZkyd1kaJAlj4OHeHI0JDO3iJRFiQDY16RMK0SHPd7E_nHv8E6nYbrerqZ4kcF0oZIKoEGOdA"/>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<span class="font-display italic text-4xl text-primary opacity-50 mix-blend-difference">VOID</span>
+</div>
+</div>
+<!-- Pane 4: The Climax -->
+<div class="masonry-item ratio-9-16 bg-surface group cursor-pointer overflow-hidden relative">
+<img alt="Distorted glitch art portrait" class="w-full h-full object-cover halftone-effect group-hover:scale-105 transition-transform duration-700 ease-out filter contrast-200" data-alt="Distorted glitch art portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGQTM3EzXATIaUDq6myHCTU3e8mS5tjvX01TKr0mEAUKxYEtOKLRp62JynW_AZT856PYkUksmNZNL0bSe9H8Op25SPeoOkxyI3hV_xnEyQWe0Z8XbUvpKEyz5Byin-C1cH-DGg70Q8Bh9BclC8MgVbbPD5FbR3r0rhZWcuX4-xN4Tu3xoKelbkMtIcEWGEmLTSXtuW-qaXJIqHNBUnJaUuOKA-uYqXJjwikbiYJSHv7wYwmyCS0HwGjleDHr2XHKNhe9lpyPimAUQ"/>
+<div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-background-dark to-transparent">
+<p class="font-display italic text-2xl text-text-main">...and then I woke up.</p>
+</div>
+</div>
+<!-- Pane 5: Textural filler -->
+<div class="masonry-item ratio-1-1 bg-background-dark border border-surface flex items-center justify-center p-8 group cursor-pointer">
+<p class="font-body text-muted text-sm leading-relaxed text-justify">
+                    [SYSTEM_LOG] Neural mapping complete. Image generation based on erratic REM cycles detected between 03:00 and 04:15. Anomaly detected in quadrant 4.
+                </p>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Reused from components, adapted to theme) -->
+<div class="fixed bottom-0 left-0 w-full flex flex-col bg-background-dark/90 backdrop-blur-md z-40 border-t border-surface">
+<div class="flex gap-2 px-4 pb-6 pt-4 max-w-md mx-auto w-full">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-2xl">mic</span>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-2xl">auto_awesome</span>
+</a>
+<!-- Active state for Visuals -->
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-primary relative" href="#">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">image</span>
+<div class="absolute -bottom-2 w-1 h-1 bg-primary rounded-full"></div>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-2xl">inventory_2</span>
+</a>
+</div>
+</div>
+</body></html>

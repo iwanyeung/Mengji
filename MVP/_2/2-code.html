@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>神谕 - 超现实捕梦网</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&amp;family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400;1,6..96,700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4FF33",
+                        "background-light": "#F4F0EB",
+                        "background-dark": "#0D0C0F",
+                        "surface": "#1E1A25",
+                        "text-main": "#F4F0EB",
+                        "muted": "#7A7585",
+                        "accent": "#FF3366",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "serif": ["Bodoni Moda", "serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px", "pill": "9999px"},
+                    letterSpacing: {
+                        "tightest": "-0.05em",
+                        "widest": "0.1em",
+                    },
+                    lineHeight: {
+                        "relaxed": "1.6",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Base typography overrides */
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #0D0C0F;
+            color: #F4F0EB;
+            overflow-x: hidden;
+        }
+
+        .font-serif-custom {
+            font-family: 'Bodoni Moda', serif;
+        }
+
+        /* Subtle noise texture overlay */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Rotated Text */
+        .vertical-text {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0D0C0F;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1E1A25;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7A7585;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-dark text-text-main antialiased relative min-h-screen pb-24">
+<!-- Grainy Noise Overlay -->
+<div class="noise-overlay"></div>
+<main class="relative flex min-h-screen w-full flex-col max-w-md mx-auto md:max-w-2xl lg:max-w-4xl px-6 pt-12">
+<!-- Header Actions -->
+<header class="flex justify-between items-center mb-12 w-full z-10">
+<button class="text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-3xl">arrow_back</span>
+</button>
+<div class="text-xs uppercase tracking-widest text-muted font-display font-semibold">
+                Oracle Analysis
+            </div>
+<button class="text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-3xl">more_vert</span>
+</button>
+</header>
+<!-- Main Content Grid -->
+<div class="flex flex-row relative w-full h-full">
+<!-- Left Margin: Vertical Date -->
+<div class="w-12 shrink-0 hidden sm:flex flex-col items-center pt-2 border-r border-surface/50 mr-6">
+<p class="vertical-text text-muted text-xs font-semibold tracking-widest uppercase opacity-70">
+                    OCT 24, 03:33 AM
+                </p>
+<div class="w-[1px] h-32 bg-surface mt-6"></div>
+</div>
+<!-- Right Content Area -->
+<div class="flex-1 flex flex-col gap-12 relative">
+<!-- Mobile Date (Visible only on small screens) -->
+<p class="sm:hidden text-muted text-xs font-semibold tracking-widest uppercase mb-4 opacity-70 border-b border-surface/50 pb-2">
+                    OCT 24, 03:33 AM
+                </p>
+<!-- Dream Transcription Block (Parallax target visually) -->
+<section class="relative z-10">
+<h1 class="font-serif-custom italic font-normal text-3xl md:text-4xl lg:text-5xl leading-[1.4] tracking-tightest text-text-main relative pl-4 sm:pl-0 border-l-2 sm:border-l-0 border-primary">
+<span class="absolute -top-6 -left-4 sm:-left-8 text-6xl text-surface font-serif-custom opacity-30 select-none">"</span>
+                        I was falling through a sky made of shattered mirrors. Every reflection showed a different age, but none of them were me...
+                        <span class="absolute -bottom-8 -right-4 sm:-right-8 text-6xl text-surface font-serif-custom opacity-30 select-none">"</span>
+</h1>
+</section>
+<!-- Divider -->
+<div class="w-full h-[1px] bg-gradient-to-r from-surface via-muted/30 to-transparent my-4"></div>
+<!-- Analysis Section -->
+<section class="flex flex-col gap-8 bg-surface/30 p-6 md:p-8 backdrop-blur-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-all duration-700"></div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">psychology</span>
+<h2 class="text-sm font-display font-semibold uppercase tracking-widest text-muted">Subconscious Pattern Detected</h2>
+</div>
+<!-- Tags -->
+<div class="flex flex-wrap gap-3">
+<div class="px-4 py-2 bg-surface border border-primary text-primary text-xs uppercase font-bold tracking-widest rounded-pill hover:bg-primary hover:text-background-dark transition-colors cursor-default">
+                            [FRAGMENTED IDENTITY]
+                        </div>
+<div class="px-4 py-2 bg-surface border border-primary text-primary text-xs uppercase font-bold tracking-widest rounded-pill hover:bg-primary hover:text-background-dark transition-colors cursor-default">
+                            [FREEFALL]
+                        </div>
+<div class="px-4 py-2 bg-surface border border-primary text-primary text-xs uppercase font-bold tracking-widest rounded-pill hover:bg-primary hover:text-background-dark transition-colors cursor-default">
+                            [MIRRORS]
+                        </div>
+</div>
+<!-- Detailed Analysis Text -->
+<div class="prose prose-invert prose-p:font-display prose-p:text-base prose-p:leading-relaxed prose-p:text-text-main/80 max-w-none">
+<p>
+                            The recurring motif of shattered glass suggests an impending breakthrough or a fracturing of an outdated self-image. The sensation of falling, contrary to popular anxiety models, appears here not as a loss of control, but as a surrender to the multiplicity of your own timelines.
+                        </p>
+<p class="mt-4 text-accent border-l border-accent pl-4 text-sm font-semibold italic opacity-90">
+                            Warning: High emotional resonance detected in mirror reflections. Recommend visual manifestation to lock the memory state.
+                        </p>
+</div>
+</section>
+<!-- Spacer for fixed button -->
+<div class="h-20 w-full"></div>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom Action Button -->
+<div class="fixed bottom-0 left-0 w-full z-50 p-4 bg-gradient-to-t from-background-dark via-background-dark to-transparent">
+<div class="max-w-md mx-auto md:max-w-2xl lg:max-w-4xl relative">
+<!-- Glitch decorative elements -->
+<div class="absolute -top-1 left-4 w-12 h-[1px] bg-primary"></div>
+<div class="absolute -top-2 right-8 w-4 h-[1px] bg-accent"></div>
+<button class="w-full h-16 bg-primary text-background-dark font-display font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-white transition-colors group relative overflow-hidden rounded-full shadow-[0_0_20px_rgba(212,255,51,0.15)] hover:shadow-[0_0_30px_rgba(212,255,51,0.3)]">
+<span class="material-symbols-outlined text-xl group-hover:rotate-12 transition-transform">visibility</span>
+                Manifest Vision <span class="text-xs opacity-70 font-normal ml-1 border border-background-dark/30 px-2 py-0.5 rounded-pill">(Premium)</span>
+<!-- Hover scanline effect -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/20 to-transparent -translate-y-full group-hover:translate-y-full transition-transform duration-700 ease-in-out"></div>
+</button>
+</div>
+</div>
+</body></html>

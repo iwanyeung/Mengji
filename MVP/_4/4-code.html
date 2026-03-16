@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Subconscious Archive</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#D4FF33",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#0D0C0F",
+                        "surface": "#1E1A25",
+                        "text-light": "#0D0C0F",
+                        "text-dark": "#F4F0EB",
+                        "muted": "#7A7585",
+                        "accent": "#FF3366"
+                    },
+                    fontFamily: {
+                        "display": ["Bodoni Moda", "serif"],
+                        "body": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    backgroundImage: {
+                        'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        
+        .dream-node {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+        }
+        
+        .dream-node:hover, .dream-node:active {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(212, 255, 51, 0.4);
+            z-index: 50;
+        }
+
+        .svg-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 5s linear forwards;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+        
+        .noise-overlay {
+            opacity: 0.05;
+            pointer-events: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-body min-h-screen overflow-hidden relative selection:bg-primary selection:text-background-dark">
+<!-- Noise Texture Overlay -->
+<div class="fixed inset-0 z-0 bg-noise noise-overlay mix-blend-overlay"></div>
+<!-- Header / Branding -->
+<header class="fixed top-0 left-0 w-full p-6 z-40 flex justify-between items-start pointer-events-none">
+<h1 class="font-display text-4xl md:text-5xl italic tracking-tighter text-text-light dark:text-text-dark opacity-90 mix-blend-difference" style="letter-spacing: -0.05em;">
+            Archive
+        </h1>
+<div class="pointer-events-auto">
+<button class="w-12 h-12 flex items-center justify-center border border-muted bg-surface/80 backdrop-blur-sm text-text-dark hover:border-primary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</header>
+<!-- Accessible Hidden List (For Screen Readers) -->
+<div class="sr-only">
+<h2>List of Past Dreams</h2>
+<ul>
+<li>October 24: Teeth falling out in the hallway. Tag: Anxiety.</li>
+<li>October 21: Floating above the city, trying to find the train station. Tag: Flight.</li>
+<li>October 15: The hallway stretches infinitely. Tag: Liminal.</li>
+<li>September 28: Looking for a lost tooth in a vast desert. Tags: Teeth, Anxiety.</li>
+</ul>
+</div>
+<!-- 2D Canvas Area (Simulated Panning/Zooming Area) -->
+<main class="relative w-[200vw] h-[200vh] -ml-[50vw] -mt-[50vh] cursor-grab active:cursor-grabbing touch-none z-10" id="canvas-area">
+<!-- SVG Connecting Lines -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+<!-- Connection: Anxiety (Teeth -> Hallway stretch) -->
+<path class="svg-line opacity-60" d="M 45% 45% Q 55% 40% 65% 55%" fill="none" stroke="var(--color-accent)" stroke-width="1"></path>
+<text class="uppercase tracking-widest" fill="var(--color-accent)" font-family="Space Grotesk" font-size="10" opacity="0.8" x="55%" y="45%">Recurring: Anxiety</text>
+<!-- Connection: Teeth -->
+<path class="svg-line opacity-60" d="M 45% 45% Q 35% 60% 30% 70%" fill="none" stroke="var(--color-accent)" stroke-width="1"></path>
+<text class="uppercase tracking-widest" fill="var(--color-accent)" font-family="Space Grotesk" font-size="10" opacity="0.8" x="35%" y="58%">[Teeth]</text>
+<!-- Connection: Flight -->
+<path class="opacity-40" d="M 65% 55% Q 70% 30% 80% 40%" fill="none" stroke="var(--color-muted)" stroke-dasharray="4 4" stroke-width="1"></path>
+</svg>
+<!-- Node 1: Recent/Focus -->
+<div class="absolute top-[45%] left-[45%] w-48 bg-surface border border-primary p-4 z-20 dream-node cursor-pointer group shadow-[0_0_15px_rgba(212,255,51,0.15)]">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs text-muted font-semibold tracking-[0.1em] uppercase">10.24</span>
+<span class="text-[10px] text-primary border border-primary px-1 uppercase">[Teeth]</span>
+</div>
+<p class="font-display italic text-lg text-text-dark leading-snug mb-3 line-clamp-3 group-hover:text-primary transition-colors">
+                Teeth falling out in the endless hallway. I try to catch them but they turn into dust.
+            </p>
+<div class="h-[1px] w-full bg-muted/30"></div>
+<p class="text-[10px] text-muted mt-2 uppercase tracking-wider">Oracle Analyzed</p>
+</div>
+<!-- Node 2: Liminal -->
+<div class="absolute top-[55%] left-[65%] w-40 bg-surface border border-muted p-4 z-10 dream-node cursor-pointer group">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs text-muted font-semibold tracking-[0.1em] uppercase">10.15</span>
+<span class="text-[10px] text-muted border border-muted px-1 uppercase">[Liminal]</span>
+</div>
+<p class="font-display italic text-base text-text-dark leading-snug mb-3 line-clamp-3">
+                The hallway stretches infinitely. Doors open to brick walls.
+            </p>
+<div class="h-[1px] w-full bg-muted/30"></div>
+</div>
+<!-- Node 3: Older Teeth -->
+<div class="absolute top-[70%] left-[30%] w-52 bg-surface border border-muted p-4 z-10 dream-node cursor-pointer group opacity-80">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs text-muted font-semibold tracking-[0.1em] uppercase">09.28</span>
+<span class="text-[10px] text-accent border border-accent px-1 uppercase">[Anxiety]</span>
+</div>
+<p class="font-display italic text-lg text-text-dark leading-snug mb-3 line-clamp-3">
+                Looking for a lost tooth in a vast, cold desert. The sand is actually tiny clocks.
+            </p>
+</div>
+<!-- Node 4: Flight -->
+<div class="absolute top-[40%] left-[80%] w-36 bg-surface border border-muted p-3 z-10 dream-node cursor-pointer group opacity-70">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs text-muted font-semibold tracking-[0.1em] uppercase">10.21</span>
+</div>
+<p class="font-display italic text-sm text-text-dark leading-snug">
+                Floating above the city, trying to find the train station.
+            </p>
+<span class="inline-block mt-2 text-[10px] text-muted border border-muted px-1 uppercase">[Flight]</span>
+</div>
+</main>
+<!-- UI Overlay (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full z-50 pointer-events-none flex flex-col items-center">
+<!-- Recenter Button -->
+<div class="w-full px-6 flex justify-end mb-4 pointer-events-auto">
+<button aria-label="Recenter map" class="w-10 h-10 rounded-full bg-surface border border-muted text-text-dark flex items-center justify-center hover:border-primary hover:text-primary transition-all shadow-lg focus:outline-none focus:ring-1 focus:ring-primary">
+<span class="material-symbols-outlined text-sm">my_location</span>
+</button>
+</div>
+<!-- Search Bar -->
+<div class="w-full max-w-md px-4 pb-6 sm:pb-8 pointer-events-auto">
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-muted group-focus-within:text-primary transition-colors">search</span>
+</div>
+<input autocomplete="off" class="w-full bg-surface/90 backdrop-blur-md border-t border-b border-l border-r border-muted text-text-dark text-sm py-4 pl-12 pr-4 focus:outline-none focus:border-primary focus:ring-0 placeholder-muted transition-colors uppercase tracking-widest font-semibold" placeholder="SEARCH SUBCONSCIOUS..." type="text"/>
+<!-- Decorative scanner line -->
+<div class="absolute bottom-0 left-0 h-[1px] bg-primary w-0 group-focus-within:w-full transition-all duration-500 ease-out"></div>
+</div>
+</div>
+<!-- Bottom Navigation (from components) -->
+<div class="w-full flex gap-2 border-t border-muted/30 bg-background-dark/95 backdrop-blur-lg px-4 pb-4 pt-3 pointer-events-auto">
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">mic</span>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-widest">Void</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">auto_awesome</span>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-widest">Oracle</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-muted hover:text-primary transition-colors" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">image</span>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-widest">Manifest</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-end gap-1 text-primary" href="#">
+<div class="flex h-8 items-center justify-center">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+</div>
+<p class="text-[10px] font-bold uppercase tracking-widest">Archive</p>
+</a>
+</div>
+<!-- Safe area spacing for mobile -->
+<div class="h-safe bg-background-dark w-full pointer-events-auto"></div>
+</div>
+</body></html>

@@ -1,0 +1,36 @@
+### macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+### Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.turbo/
+.next/
+
+### Xcode / iOS
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad
+*.xcuserstate
+*.orig
+
+### Logs
+*.log
+
+### Environment / Secrets
+.env
+.env.*
+
+### Tools / Temporary
+*.swp
+*.swo
+*.tmp
+
