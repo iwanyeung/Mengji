@@ -9,11 +9,14 @@ struct InsightListView: View {
     var onSelectDream: (UUID) -> Void
 
     @ObservedObject private var store = DreamStore.shared
+    @Environment(\.openPersonalCenter) private var openPersonalCenter
 
     var body: some View {
         ZStack {
-            AppTheme.background
-                .ignoresSafeArea()
+            AppAuroraBackground(
+                style: .insight,
+                prioritizeTextReadability: true
+            )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -26,12 +29,19 @@ struct InsightListView: View {
         .navigationTitle("梦析")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(AppTheme.background, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileNavButton(style: .compact) {
+                    openPersonalCenter()
+                }
+            }
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("已整理的梦")
-                .font(.system(size: 11, weight: .semibold, design: .default))
+                .font(AppTheme.capsFont(size: 11, weight: .semibold))
                 .textCase(.uppercase)
                 .kerning(1.4)
                 .foregroundColor(AppTheme.muted)
@@ -54,11 +64,12 @@ struct InsightListView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(dream.title)
-                                .font(.system(size: 16, weight: .semibold, design: .default))
+                                .font(AppTheme.titleFont(size: 16))
+                                .kerning(-0.2)
                                 .foregroundColor(AppTheme.text)
                                 .multilineTextAlignment(.leading)
                             Text(dateString(for: dream.createdAt))
-                                .font(.system(size: 12, weight: .regular, design: .default))
+                                .font(AppTheme.bodyFont(size: 12))
                                 .foregroundColor(AppTheme.muted)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,10 +95,10 @@ struct InsightListView: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("还没有已整理的梦")
-                .font(.system(size: 14, weight: .semibold, design: .default))
+                .font(AppTheme.bodyFont(size: 14, weight: .semibold))
                 .foregroundColor(AppTheme.text)
             Text("从「录梦」开始说说最近的一场梦，它会出现在这里。")
-                .font(.system(size: 12, weight: .regular, design: .default))
+                .font(AppTheme.bodyFont(size: 12))
                 .foregroundColor(AppTheme.muted)
         }
         .padding(.horizontal, 24)

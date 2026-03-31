@@ -14,15 +14,16 @@ struct WorkshopPlaceholderView: View {
                 Image(systemName: "paintbrush.pointed.fill")
                     .font(.system(size: 48))
                     .foregroundColor(AppTheme.muted)
-                Text("显化工坊")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
+                Text("梦作间")
+                    .font(AppTheme.titleFont(size: 22))
+                    .kerning(-0.4)
                     .foregroundColor(AppTheme.text)
-                Text("从梦析中选择一条梦，生成四格漫画")
-                    .font(.system(size: 14, weight: .regular, design: .default))
+                Text("从梦析中选一条梦，让它落成四格故事")
+                    .font(AppTheme.bodyFont(size: 14))
                     .foregroundColor(AppTheme.muted)
                     .multilineTextAlignment(.center)
             }
         }
-        .navigationTitle("显化工坊")
+        .navigationTitle("梦作间")
     }
 }

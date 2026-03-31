@@ -2,11 +2,15 @@ import SwiftUI
 
 struct RecordingView: View {
     var onFinishRecording: ((UUID) -> Void)? = nil
+    /// 由 Tab 容器在切回「录梦」时递增，用于标题 blur 动画重播
+    var blurTitleReplayToken: UInt = 0
+
     @StateObject private var viewModel = RecordingViewModel()
+    @Environment(\.openPersonalCenter) private var openPersonalCenter
 
     var body: some View {
         ZStack {
-            AppTheme.background
+            RecordingAuroraBackground(viewModel: viewModel)
                 .ignoresSafeArea()
 
             VStack {
@@ -30,117 +34,143 @@ struct RecordingView: View {
                 .padding(.leading, 24)
                 .padding(.bottom, 24)
         }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.background.opacity(0.2), for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileNavButton(style: .compact) {
+                    openPersonalCenter()
+                }
+            }
+        }
         .onAppear {
             viewModel.onFinishRecording = onFinishRecording
+            viewModel.refreshAuroraPolicy()
         }
     }
 
     private var header: some View {
-        HStack {
-            Text("告诉我")
-                .font(.system(size: 40, weight: .bold, design: .serif))
-                .kerning(-2)
-                .foregroundColor(AppTheme.text)
-                .padding(.top, 32)
-            Spacer()
+        HStack(alignment: .top) {
+            BlurRevealTitle(
+                text: "说说这场梦…",
+                fontSize: 36,
+                replayToken: blurTitleReplayToken
+            )
+            .kerning(-0.5)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
     }
 
     private var fragmentsList: some View {
-        List {
-            // 当前录制中的实时转写
-            if viewModel.isRecording && !viewModel.liveTranscript.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("当前录制中…")
-                        .font(.system(size: 12, weight: .semibold, design: .default))
-                        .foregroundColor(AppTheme.muted)
-                    Text(viewModel.liveTranscript)
-                        .foregroundColor(AppTheme.text.opacity(0.9))
-                        .font(.system(size: 16, weight: .regular, design: .default))
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-
-            // 左滑删除提示
-            if !viewModel.segments.isEmpty {
-                Text("向左滑动梦境片段即可删除")
-                    .font(.system(size: 10, weight: .regular, design: .default))
-                    .foregroundColor(AppTheme.muted.opacity(0.7))
+        GeometryReader { proxy in
+            let reservedBottom = finishButtonReservedBottom + proxy.safeAreaInsets.bottom
+            List {
+                // 当前录制中的实时转写
+                if viewModel.isRecording && !viewModel.liveTranscript.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("当前录制中…")
+                            .font(AppTheme.capsFont(size: 12, weight: .semibold))
+                            .foregroundColor(AppTheme.muted)
+                        Text(viewModel.liveTranscript)
+                            .foregroundColor(AppTheme.text.opacity(0.9))
+                            .font(AppTheme.bodyFont(size: 16))
+                    }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-            }
+                }
 
-            // 片段列表
-            ForEach(Array(viewModel.segments.enumerated()), id: \.element.id) { index, segment in
-                HStack {
-                    VStack(alignment: .leading, spacing: 10) {
-                        // 第 1 行：日期 + 梦段编号
-                        Text(title(for: segment, at: index))
-                            .foregroundColor(AppTheme.text.opacity(0.9))
-                            .font(.system(size: 14, weight: .semibold, design: .default))
+                // 左滑删除提示
+                if !viewModel.segments.isEmpty {
+                    Text("向左滑动梦境片段即可删除")
+                        .font(AppTheme.bodyFont(size: 10))
+                        .foregroundColor(AppTheme.muted.opacity(0.7))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
 
-                        // 第 2 行：转写摘要
-                        Text(preview(for: segment))
-                            .foregroundColor(AppTheme.text.opacity(0.9))
-                            .font(.system(size: 16, weight: .regular, design: .default))
+                // 片段列表
+                ForEach(Array(viewModel.segments.enumerated()), id: \.element.id) { index, segment in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 10) {
+                            // 第 1 行：日期 + 梦段编号
+                            Text(title(for: segment, at: index))
+                                .foregroundColor(AppTheme.text.opacity(0.9))
+                                .font(AppTheme.bodyFont(size: 14, weight: .semibold))
 
-                        // 第 3 行：小黄线 + 时间 · 时长
-                        HStack(spacing: 8) {
-                            Rectangle()
-                                .fill(AppTheme.primaryColor)
-                                .frame(width: 16, height: 1)
+                            // 第 2 行：转写摘要
+                            Text(preview(for: segment))
+                                .foregroundColor(AppTheme.text.opacity(0.9))
+                                .font(AppTheme.bodyFont(size: 16))
 
-                            Text("\(timeLabel(for: segment)) · 时长 \(segment.durationText)")
-                                .font(.system(size: 11, weight: .semibold, design: .default))
-                                .textCase(.uppercase)
-                                .kerning(1.2)
-                                .foregroundColor(AppTheme.muted)
+                            // 第 3 行：小黄线 + 时间 · 时长
+                            HStack(spacing: 8) {
+                                Rectangle()
+                                    .fill(AppTheme.primaryColor)
+                                    .frame(width: 16, height: 1)
+
+                                Text("\(timeLabel(for: segment)) · 时长 \(segment.durationText)")
+                                    .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                                    .textCase(.uppercase)
+                                    .kerning(1.2)
+                                    .foregroundColor(AppTheme.muted)
+                            }
                         }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(maxWidth: UIScreen.main.bounds.width * 0.6, alignment: .leading)
-                    .opacity(opacityForIndex(index))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: proxy.size.width * 0.6, alignment: .leading)
 
-                    Spacer(minLength: 0)
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        viewModel.deleteSegment(id: segment.id)
-                    } label: {
-                        Label("删除", systemImage: "trash")
+                        Spacer(minLength: 0)
                     }
-                    .tint(.red)
-                }
-            }
-
-            // 底部占位行，避免被录音按钮遮挡
-            if !viewModel.segments.isEmpty {
-                Color.clear
-                    .frame(height: 120)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            viewModel.deleteSegment(id: segment.id)
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
+
+                // 底部占位行：与「完成并整理」按钮区域保持动态安全距离，避免重叠
+                if !viewModel.segments.isEmpty {
+                    Color.clear
+                        .frame(height: reservedBottom)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .padding(.top, 40)
+            .padding(.bottom, 16)
+            .overlay(alignment: .bottom) {
+                // 与按钮区域对齐的底部渐隐，避免最后一条文字压到按钮区
+                LinearGradient(
+                    colors: [Color.clear, AppTheme.background.opacity(0.82), AppTheme.background],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: min(reservedBottom, max(120, proxy.size.height * 0.28)))
+                .allowsHitTesting(false)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .padding(.top, 40)
-        .padding(.bottom, 40)
     }
 
     private var recordButton: some View {
         VStack(spacing: 8) {
             Text(viewModel.buttonHint)
-                .font(.system(size: 10, weight: .bold, design: .default))
+                .font(AppTheme.capsFont(size: 10, weight: .bold))
                 .textCase(.uppercase)
                 .kerning(2)
                 .foregroundColor(viewModel.isRecording ? AppTheme.accent : AppTheme.primaryColor)
 
             if viewModel.isRecording && !viewModel.isLocked {
                 Text("上滑锁定")
-                    .font(.system(size: 10, weight: .regular, design: .default))
+                    .font(AppTheme.capsFont(size: 10, weight: .regular))
                     .textCase(.uppercase)
                     .kerning(1.5)
                     .foregroundColor(AppTheme.muted)
@@ -214,7 +244,7 @@ struct RecordingView: View {
                     viewModel.finishAllSegments()
                 } label: {
                     Text("完成并整理")
-                        .font(.system(size: 12, weight: .semibold, design: .default))
+                        .font(AppTheme.capsFont(size: 12, weight: .semibold))
                         .textCase(.uppercase)
                         .kerning(1.5)
                         .foregroundColor(AppTheme.background)
@@ -266,15 +296,9 @@ struct RecordingView: View {
         return formatter.string(from: segment.occurredAt)
     }
 
-    private func opacityForIndex(_ index: Int) -> Double {
-        // 最近的片段最清晰，往下逐渐淡出
-        switch index {
-        case 0: return 1.0
-        case 1: return 0.9
-        case 2: return 0.8
-        case 3: return 0.7
-        default: return 0.6
-        }
+    private var finishButtonReservedBottom: CGFloat {
+        // 按钮高度(约 44) + 按钮底部间距(24) + 额外缓冲，确保末条内容在渐隐区上方结束
+        44 + 24 + 84
     }
 }
 

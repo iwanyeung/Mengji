@@ -8,15 +8,19 @@ import SwiftUI
 struct MainTabView: View {
     @StateObject private var appState = AppState()
     @StateObject private var dreamStore = DreamStore.shared
+    @State private var recordingBlurTitleReplayToken: UInt = 0
 
     var body: some View {
         TabView(selection: Binding(
             get: { appState.selectedTab },
             set: { appState.selectedTab = $0 }
         )) {
-            RecordingTabView(onFinishRecording: { dreamId in
-                appState.openInsightAfterRecording(dreamId: dreamId)
-            })
+            RecordingTabView(
+                blurTitleReplayToken: recordingBlurTitleReplayToken,
+                onFinishRecording: { dreamId in
+                    appState.openInsightAfterRecording(dreamId: dreamId)
+                }
+            )
             .tabItem {
                 Label(AppTab.recording.title, systemImage: AppTab.recording.systemImage)
             }
@@ -34,7 +38,15 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.workshop)
 
-            StarMapPlaceholderView()
+            StarMapView(
+                isTabActive: appState.selectedTab == .starMap,
+                onSelectDream: { dreamId in
+                    appState.openInsight(dreamId: dreamId)
+                },
+                onViewComic: { dreamId in
+                    appState.openComic(dreamId: dreamId)
+                }
+            )
                 .tabItem {
                     Label(AppTab.starMap.title, systemImage: AppTab.starMap.systemImage)
                 }
@@ -43,16 +55,25 @@ struct MainTabView: View {
         .tint(AppTheme.primaryColor)
         .preferredColorScheme(.dark)
         .environmentObject(dreamStore)
+        .onChange(of: appState.selectedTab) { old, new in
+            if new == .recording && old != .recording {
+                recordingBlurTitleReplayToken &+= 1
+            }
+        }
     }
 }
 
 /// 录梦 Tab 容器（仅包装一层，便于传入完成回调）
 private struct RecordingTabView: View {
+    var blurTitleReplayToken: UInt
     var onFinishRecording: (UUID) -> Void
 
     var body: some View {
         NavigationStack {
-            RecordingView(onFinishRecording: onFinishRecording)
+            RecordingView(
+                onFinishRecording: onFinishRecording,
+                blurTitleReplayToken: blurTitleReplayToken
+            )
         }
     }
 }
@@ -77,9 +98,17 @@ struct InsightTabView: View {
                 }
             }
         }
+        .onAppear {
+            // 兜底：当 pendingDreamIdForInsight 在 Tab 切换瞬间写入时，onChange 可能出现时序错过。
+            if let id = appState.pendingDreamIdForInsight {
+                navigationPath.append(id)
+                appState.clearPendingDreamId()
+            }
+        }
     }
 }
 
 #Preview {
     MainTabView()
+        .environment(\.openPersonalCenter, {})
 }

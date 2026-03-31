@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AVFoundation
+import AVFAudio
 import Speech
 
 final class RecordingViewModel: ObservableObject {
@@ -22,13 +23,37 @@ final class RecordingViewModel: ObservableObject {
     @Published var liveTranscript: String = ""
     @Published var speechAuthDenied: Bool = false
 
+    /// 语音识别管线曾失败（无权限/识别失败时极光保持静态，避免「像在监听」）
+    @Published private(set) var recognitionPipelineFailed: Bool = false
+
+    /// 麦克风被拒或语音识别器不可用 → 极光无动效
+    @Published private(set) var auroraMotionAllowed: Bool = true
+
+    /// 平滑后的输入电平 0…1，用于极光与脉冲判定
+    @Published private(set) var smoothedInputLevel: CGFloat = 0
+
+    /// 每次 +1 触发一次极光「波」脉冲（与录音电平从低到高跳变 + 已识别到中文 同时满足时）
+    @Published private(set) var auroraPulseToken: UInt = 0
+
     private var currentStartDate: Date?
     private var timer: Timer?
 
     private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+    // lazy：延迟到首次录音时初始化，避免 App 启动时在主线程加载语音识别框架
+    private lazy var speechRecognizer: SFSpeechRecognizer? = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+
+    private let levelSmoothingAlpha: CGFloat = 0.22
+    private var smoothedLevelInternal: CGFloat = 0
+
+    private var levelInQuietBand: Bool = true
+    private let quietLevelThreshold: CGFloat = 0.055
+    private let speechLevelThreshold: CGFloat = 0.17
+    private var pulseCooldownUntil: Date = .distantPast
+    private let pulseCooldown: TimeInterval = 0.85
+
+    private let levelProcessQueue = DispatchQueue(label: "mengji.recording.level")
 
     var formattedCurrentDuration: String {
         let total = Int(currentDuration.rounded())
@@ -47,6 +72,21 @@ final class RecordingViewModel: ObservableObject {
         }
     }
 
+    init() {
+        refreshAuroraPolicy()
+    }
+
+    func refreshAuroraPolicy() {
+        let mic = AVAudioApplication.shared.recordPermission
+        let micDenied = (mic == .denied)
+        let speechAvailable = speechRecognizer?.isAvailable ?? false
+
+        let allowed = !micDenied && speechAvailable && !speechAuthDenied && !recognitionPipelineFailed
+        if auroraMotionAllowed != allowed {
+            auroraMotionAllowed = allowed
+        }
+    }
+
     func beginRecording() {
         guard !isRecording else { return }
 
@@ -55,9 +95,12 @@ final class RecordingViewModel: ObservableObject {
                 guard let self else { return }
                 switch status {
                 case .authorized:
+                    self.speechAuthDenied = false
+                    self.refreshAuroraPolicy()
                     self.startRecordingSession()
                 default:
                     self.speechAuthDenied = true
+                    self.refreshAuroraPolicy()
                 }
             }
         }
@@ -66,6 +109,7 @@ final class RecordingViewModel: ObservableObject {
     private func startRecordingSession() {
         guard let speechRecognizer, speechRecognizer.isAvailable else {
             speechAuthDenied = true
+            refreshAuroraPolicy()
             return
         }
 
@@ -74,6 +118,9 @@ final class RecordingViewModel: ObservableObject {
         currentStartDate = Date()
         currentDuration = 0
         liveTranscript = ""
+        recognitionPipelineFailed = false
+        resetLevelStateForNewTake()
+        refreshAuroraPolicy()
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -88,6 +135,7 @@ final class RecordingViewModel: ObservableObject {
         } catch {
             speechAuthDenied = true
             isRecording = false
+            refreshAuroraPolicy()
             return
         }
 
@@ -103,12 +151,15 @@ final class RecordingViewModel: ObservableObject {
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
+            self?.processAudioLevel(buffer: buffer)
         }
 
         do {
             try audioEngine.start()
         } catch {
             isRecording = false
+            recognitionPipelineFailed = true
+            refreshAuroraPolicy()
             return
         }
 
@@ -118,17 +169,102 @@ final class RecordingViewModel: ObservableObject {
                 let text = result.bestTranscription.formattedString
                 DispatchQueue.main.async {
                     self.liveTranscript = text
+                    self.evaluateAuroraPulse()
                 }
-            } else if error != nil {
+            } else if let error {
                 DispatchQueue.main.async {
-                    self.isRecording = false
+                    // 用户松手结束录音时会 cancel task，系统仍回调 error，不能当作「识别管线失败」
+                    if Self.isBenignEndOfSpeechTaskError(error) {
+                        return
+                    }
+                    guard self.isRecording else { return }
+                    self.teardownRecordingSession()
+                    self.recognitionPipelineFailed = true
+                    self.refreshAuroraPolicy()
                 }
             }
         }
     }
 
-    func endRecording() {
+    private func resetLevelStateForNewTake() {
+        smoothedLevelInternal = 0
+        smoothedInputLevel = 0
+        levelInQuietBand = true
+    }
+
+    private func processAudioLevel(buffer: AVAudioPCMBuffer) {
+        let raw = Self.rmsNormalized(from: buffer)
+        levelProcessQueue.async { [weak self] in
+            guard let self else { return }
+            let next = CGFloat(raw)
+            let s = self.smoothedLevelInternal * (1 - self.levelSmoothingAlpha) + next * self.levelSmoothingAlpha
+            self.smoothedLevelInternal = s
+            DispatchQueue.main.async {
+                self.smoothedInputLevel = s
+                self.evaluateAuroraPulse()
+            }
+        }
+    }
+
+    private func evaluateAuroraPulse() {
         guard isRecording else { return }
+        guard Self.containsChinese(liveTranscript) else { return }
+        guard Date() > pulseCooldownUntil else { return }
+
+        let l = smoothedInputLevel
+        if l < quietLevelThreshold {
+            levelInQuietBand = true
+            return
+        }
+        if levelInQuietBand && l > speechLevelThreshold {
+            levelInQuietBand = false
+            auroraPulseToken &+= 1
+            pulseCooldownUntil = Date().addingTimeInterval(pulseCooldown)
+        }
+    }
+
+    /// 结束录音时 cancel recognition task 产生的错误，不应关闭极光
+    private static func isBenignEndOfSpeechTaskError(_ error: Error) -> Bool {
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorCancelled {
+            return true
+        }
+        return false
+    }
+
+    /// CJK 统一汉字 + 扩展 A 区，用于区分「有中文转写」与咳嗽等无文本输入
+    private static func containsChinese(_ s: String) -> Bool {
+        s.unicodeScalars.contains { u in
+            let v = u.value
+            return (0x4E00...0x9FFF).contains(v) || (0x3400...0x4DBF).contains(v)
+        }
+    }
+
+    private static func rmsNormalized(from buffer: AVAudioPCMBuffer) -> Float {
+        guard let channelData = buffer.floatChannelData else { return 0 }
+        let frames = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        guard frames > 0, channelCount > 0 else { return 0 }
+
+        var sum: Float = 0
+        for ch in 0..<channelCount {
+            let ptr = channelData[ch]
+            for i in 0..<frames {
+                let s = ptr[i]
+                sum += s * s
+            }
+        }
+        let count = Float(frames * channelCount)
+        let rms = sqrt(sum / max(count, 1))
+        // 柔和映射到 0…1，避免环境底噪长期顶满
+        let gain: Float = 28
+        return min(1, rms * gain)
+    }
+
+    private func teardownRecordingSession() {
         isRecording = false
         isLocked = false
 
@@ -143,6 +279,17 @@ final class RecordingViewModel: ObservableObject {
         recognitionRequest = nil
         recognitionTask?.cancel()
         recognitionTask = nil
+
+        smoothedLevelInternal = 0
+        smoothedInputLevel = 0
+        levelInQuietBand = true
+    }
+
+    func endRecording() {
+        guard isRecording else { return }
+        teardownRecordingSession()
+        recognitionPipelineFailed = false
+        refreshAuroraPolicy()
 
         let now = Date()
         let start = currentStartDate ?? now
@@ -203,12 +350,13 @@ final class RecordingViewModel: ObservableObject {
             comicArtifacts: []
         )
 
+        let segmentCount = segments.count
         DreamStore.shared.upsert(dream)
         segments.removeAll()
 
         Analytics.track("dream_recording_finished", properties: [
             "dreamId": dream.id.uuidString,
-            "segmentCount": segments.count
+            "segmentCount": segmentCount
         ])
 
         onFinishRecording?(dream.id)
@@ -218,4 +366,3 @@ final class RecordingViewModel: ObservableObject {
         segments.removeAll { $0.id == id }
     }
 }
-

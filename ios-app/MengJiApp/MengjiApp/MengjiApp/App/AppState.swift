@@ -16,7 +16,7 @@ enum AppTab: Int, CaseIterable {
         switch self {
         case .recording: return "录梦"
         case .insight: return "梦析"
-        case .workshop: return "显化工坊"
+        case .workshop: return "梦作间"
         case .starMap: return "潜意识星图"
         }
     }
@@ -35,7 +35,9 @@ final class AppState: ObservableObject {
     @Published var selectedTab: AppTab = .recording
     /// 录梦完成后要打开的梦 ID，打开梦析后清空
     @Published var pendingDreamIdForInsight: UUID?
-    /// 从梦析跳转到显化工坊时要预选的梦 ID，用完后清空
+    /// 跳到梦析后自动打开该梦的四格回看
+    @Published var pendingOpenComicFromInsight: Bool = false
+    /// 从梦析跳转到梦作间时要预选的梦 ID，用完后清空
     @Published var pendingDreamIdForWorkshop: UUID?
 
     func openInsightAfterRecording(dreamId: UUID) {
@@ -43,11 +45,20 @@ final class AppState: ObservableObject {
         selectedTab = .insight
     }
 
+    /// 从其他入口（如潜意识星图）跳转梦析
+    func openInsight(dreamId: UUID) {
+        openInsightAfterRecording(dreamId: dreamId)
+    }
+
     func clearPendingDreamId() {
         pendingDreamIdForInsight = nil
     }
 
-    /// 从梦析页进入显化工坊，并携带当前梦
+    func clearPendingComicOpenFlag() {
+        pendingOpenComicFromInsight = false
+    }
+
+    /// 从梦析页进入梦作间，并携带当前梦
     func openWorkshop(from dreamId: UUID) {
         pendingDreamIdForWorkshop = dreamId
         selectedTab = .workshop
@@ -56,5 +67,12 @@ final class AppState: ObservableObject {
     /// 从梦析页跳转到潜意识星图
     func openStarMap() {
         selectedTab = .starMap
+    }
+
+    /// 从潜意识星图直接回看已落成四格
+    func openComic(dreamId: UUID) {
+        pendingDreamIdForInsight = dreamId
+        pendingOpenComicFromInsight = true
+        selectedTab = .insight
     }
 }

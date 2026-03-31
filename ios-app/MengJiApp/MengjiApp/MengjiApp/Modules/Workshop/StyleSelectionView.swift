@@ -3,7 +3,7 @@ import SwiftUI
 struct StyleSelectionView: View {
     var dreamId: UUID?
 
-    @EnvironmentObject private var dreamStore: DreamStore
+    @ObservedObject var appState: AppState
     @State private var selectedStyleId: String?
     @State private var navigateToPayment = false
 
@@ -24,65 +24,42 @@ struct StyleSelectionView: View {
 
     var body: some View {
         ZStack {
-            AppTheme.background
-                .ignoresSafeArea()
+            AppAuroraBackground(style: .workshop)
 
-            VStack(spacing: 24) {
-                header
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        ForEach(styles) { style in
-                            StyleCard(
-                                style: style,
-                                isSelected: style.id == selectedStyleId
-                            )
-                            .onTapGesture {
+                    ForEach(styles) { style in
+                        StyleCard(
+                            style: style,
+                            isSelected: style.id == selectedStyleId
+                        )
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: WorkshopMotion.selectDuration)) {
                                 selectedStyleId = style.id
                             }
                         }
                     }
-                    .padding(.bottom, 40)
                 }
-
-                Button {
-                    if selectedStyleId == nil {
-                        selectedStyleId = styles.first?.id
-                    }
-                    if selectedStyleId != nil {
-                        navigateToPayment = true
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Text("继续 · 确认并显化")
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.system(size: 14, weight: .semibold, design: .default))
-                    .foregroundColor(AppTheme.background)
-                    .padding(.horizontal, 16)
-                    .frame(height: 48)
-                    .background(AppTheme.primaryColor)
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 18)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-
-            NavigationLink(
-                destination: MockPaymentView(
-                    dreamId: dreamId,
-                    styleId: selectedStyleId ?? styles.first?.id ?? ""
-                ),
-                isActive: $navigateToPayment
-            ) {
-                EmptyView()
-            }
-            .hidden()
+        }
+        .navigationDestination(isPresented: $navigateToPayment) {
+            MockPaymentView(
+                dreamId: dreamId,
+                styleId: selectedStyleId ?? styles.first?.id ?? "",
+                appState: appState
+            )
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomCTA
         }
         .navigationTitle("选择风格")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(AppTheme.background, for: .navigationBar)
         .onAppear {
             if selectedStyleId == nil {
                 selectedStyleId = styles.first?.id
@@ -92,13 +69,43 @@ struct StyleSelectionView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("给这条梦选一个最合适的画面语言。")
-                .font(.system(size: 16, weight: .regular, design: .default))
+            Text("为这条梦选择一种落成风格。")
+                .font(AppTheme.bodyFont(size: 18, weight: .semibold))
                 .foregroundColor(AppTheme.text)
-            Text("MVP 阶段先提供两种典型风格，后续可以慢慢扩展更多模板。")
-                .font(.system(size: 12, weight: .regular, design: .default))
+
+            Text("给这条梦选一个最合适的画面语言。")
+                .font(AppTheme.bodyFont(size: 13))
                 .foregroundColor(AppTheme.muted)
         }
+    }
+
+    private var bottomCTA: some View {
+        Button {
+            if selectedStyleId == nil {
+                selectedStyleId = styles.first?.id
+            }
+            if selectedStyleId != nil {
+                withAnimation(WorkshopMotion.navigationSpring) {
+                    navigateToPayment = true
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Text("继续 · 让这条梦落成四格")
+                Spacer()
+                Image(systemName: "arrow.right")
+            }
+            .font(AppTheme.bodyFont(size: 16, weight: .semibold))
+            .foregroundColor(AppTheme.background)
+            .padding(.horizontal, 16)
+            .frame(height: 56)
+            .background(AppTheme.primaryColor)
+        }
+        .buttonStyle(WorkshopPrimaryCTAButtonStyle())
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
+        .background(AppTheme.background.opacity(0.92))
     }
 }
 
@@ -135,15 +142,15 @@ private struct StyleCard: View {
                 )
 
             Text(style.title)
-                .font(.system(size: 15, weight: .semibold, design: .default))
+                .font(AppTheme.titleFont(size: 15))
                 .foregroundColor(AppTheme.text)
 
             Text(style.description)
-                .font(.system(size: 12, weight: .regular, design: .default))
+                .font(AppTheme.bodyFont(size: 13))
                 .foregroundColor(AppTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 0)
                 .strokeBorder(
@@ -152,6 +159,14 @@ private struct StyleCard: View {
                 )
                 .background(AppTheme.background.opacity(0.7))
         )
+        .scaleEffect(isSelected ? 1.0 : 0.995)
+        .shadow(
+            color: isSelected ? accentColor.opacity(0.2) : .clear,
+            radius: isSelected ? 12 : 0,
+            x: 0,
+            y: 3
+        )
+        .animation(.easeInOut(duration: WorkshopMotion.selectDuration), value: isSelected)
     }
 
     private var accentColor: Color {

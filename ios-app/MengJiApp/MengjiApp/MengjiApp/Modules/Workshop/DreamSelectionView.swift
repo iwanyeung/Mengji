@@ -20,12 +20,12 @@ struct DreamSelectionView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(dream.title)
-                                        .font(.system(size: 15, weight: .semibold, design: .default))
+                                        .font(AppTheme.titleFont(size: 15))
                                         .foregroundColor(AppTheme.text)
                                         .multilineTextAlignment(.leading)
 
                                     Text(shortPreview(from: dream.organizedText))
-                                        .font(.system(size: 12, weight: .regular, design: .default))
+                                        .font(AppTheme.bodyFont(size: 12))
                                         .foregroundColor(AppTheme.muted)
                                         .lineLimit(2)
                                 }
@@ -52,7 +52,7 @@ struct DreamSelectionView: View {
                                 Spacer()
                                 Image(systemName: "checkmark")
                             }
-                            .font(.system(size: 14, weight: .semibold, design: .default))
+                            .font(AppTheme.bodyFont(size: 14, weight: .semibold))
                             .foregroundColor(AppTheme.background)
                             .padding(.horizontal, 16)
                             .frame(height: 48)

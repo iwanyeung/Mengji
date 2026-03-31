@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkshopHomeView: View {
     @ObservedObject var appState: AppState
     @EnvironmentObject private var dreamStore: DreamStore
+    @Environment(\.openPersonalCenter) private var openPersonalCenter
 
     @State private var selectedDreamId: UUID?
     @State private var navigateToStyleSelection = false
@@ -11,26 +12,21 @@ struct WorkshopHomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.background
-                    .ignoresSafeArea()
+                AppAuroraBackground(style: .workshop)
 
-                VStack(spacing: 24) {
-                    header
-                    selectedDreamSection
-                    actionButtons
-
-                    Spacer()
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        header
+                        selectedDreamSection
+                        dreamPickerButton
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 32)
-
-                NavigationLink(
-                    destination: StyleSelectionView(dreamId: selectedDreamId),
-                    isActive: $navigateToStyleSelection
-                ) {
-                    EmptyView()
-                }
-                .hidden()
+            }
+            .navigationDestination(isPresented: $navigateToStyleSelection) {
+                StyleSelectionView(dreamId: selectedDreamId, appState: appState)
             }
             .sheet(isPresented: $showDreamPicker) {
                 DreamSelectionView(
@@ -41,8 +37,19 @@ struct WorkshopHomeView: View {
                 )
                 .environmentObject(dreamStore)
             }
-            .navigationTitle("显化工坊")
-            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomCTA
+            }
+            .navigationTitle("梦作间")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(AppTheme.background, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileNavButton(style: .compact) {
+                        openPersonalCenter()
+                    }
+                }
+            }
         }
         .onAppear {
             if let pendingId = appState.pendingDreamIdForWorkshop {
@@ -63,11 +70,11 @@ struct WorkshopHomeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("把某一晚的梦，变成可以拿在手里的四格故事。")
-                .font(.system(size: 16, weight: .regular, design: .default))
+                .font(AppTheme.bodyFont(size: 18, weight: .semibold))
                 .foregroundColor(AppTheme.text)
 
-            Text("请选择一条你想显化的梦，再为它挑一个合适的视觉风格。")
-                .font(.system(size: 12, weight: .regular, design: .default))
+            Text("选一条你想继续的梦，让它落成一组四格故事。")
+                .font(AppTheme.bodyFont(size: 13))
                 .foregroundColor(AppTheme.muted)
         }
     }
@@ -79,7 +86,7 @@ struct WorkshopHomeView: View {
                     .fill(AppTheme.primaryColor)
                     .frame(width: 18, height: 1)
                 Text("已选中的梦")
-                    .font(.system(size: 11, weight: .semibold, design: .default))
+                    .font(AppTheme.capsFont(size: 11, weight: .semibold))
                     .textCase(.uppercase)
                     .kerning(1.4)
                     .foregroundColor(AppTheme.muted)
@@ -91,38 +98,42 @@ struct WorkshopHomeView: View {
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("还没有选中哪一条梦")
-                        .font(.system(size: 14, weight: .semibold, design: .default))
+                        .font(AppTheme.bodyFont(size: 14, weight: .semibold))
                         .foregroundColor(AppTheme.text)
-                    Text("可以从最近整理好的梦里挑一条，作为这次显化的起点。")
-                        .font(.system(size: 12, weight: .regular, design: .default))
+                    Text("可以从最近整理好的梦里挑一条，作为这次落成的起点。")
+                        .font(AppTheme.bodyFont(size: 12))
                         .foregroundColor(AppTheme.muted)
                 }
             }
         }
     }
 
-    private var actionButtons: some View {
-        VStack(spacing: 12) {
-            Button {
+    private var dreamPickerButton: some View {
+        Button {
+            withAnimation(WorkshopMotion.navigationSpring) {
                 showDreamPicker = true
-            } label: {
-                HStack(spacing: 10) {
-                    Text("从梦中挑选")
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                }
-                .font(.system(size: 14, weight: .semibold, design: .default))
-                .foregroundColor(AppTheme.text)
-                .padding(.horizontal, 16)
-                .frame(height: 48)
-                .background(
-                    RoundedRectangle(cornerRadius: 0)
-                        .strokeBorder(AppTheme.surface, lineWidth: 1)
-                        .background(AppTheme.background.opacity(0.8))
-                )
             }
-            .buttonStyle(.plain)
+        } label: {
+            HStack(spacing: 10) {
+                Text("从梦中挑选")
+                Spacer()
+                Image(systemName: "chevron.down")
+            }
+            .font(AppTheme.bodyFont(size: 14, weight: .semibold))
+            .foregroundColor(AppTheme.text)
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 0)
+                    .strokeBorder(AppTheme.surface, lineWidth: 1)
+                    .background(AppTheme.background.opacity(0.8))
+            )
+        }
+        .buttonStyle(WorkshopSecondaryButtonStyle())
+    }
 
+    private var bottomCTA: some View {
+        VStack(spacing: 0) {
             Button {
                 if selectedDreamId == nil {
                     selectedDreamId = dreamStore.visibleDreams().first?.id
@@ -131,7 +142,9 @@ struct WorkshopHomeView: View {
                     Analytics.track("workshop_start_from_home", properties: [
                         "dreamId": selectedDreamId?.uuidString ?? ""
                     ])
-                    navigateToStyleSelection = true
+                    withAnimation(WorkshopMotion.navigationSpring) {
+                        navigateToStyleSelection = true
+                    }
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -139,16 +152,20 @@ struct WorkshopHomeView: View {
                     Spacer()
                     Image(systemName: "sparkles")
                 }
-                .font(.system(size: 14, weight: .semibold, design: .default))
+                .font(AppTheme.bodyFont(size: 16, weight: .semibold))
                 .foregroundColor(AppTheme.background)
                 .padding(.horizontal, 16)
-                .frame(height: 48)
+                .frame(height: 56)
                 .background(AppTheme.primaryColor)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(WorkshopPrimaryCTAButtonStyle())
             .disabled(dreamStore.visibleDreams().isEmpty)
             .opacity(dreamStore.visibleDreams().isEmpty ? 0.4 : 1.0)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
         }
+        .background(AppTheme.background.opacity(0.92))
     }
 }
 
@@ -156,23 +173,24 @@ private struct DreamSummaryCard: View {
     let dream: Dream
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(dream.title)
-                .font(.system(size: 16, weight: .semibold, design: .default))
+                .font(AppTheme.titleFont(size: 16))
+                .kerning(-0.2)
                 .foregroundColor(AppTheme.text)
 
             Text(shortPreview(from: dream.organizedText))
-                .font(.system(size: 13, weight: .regular, design: .default))
+                .font(AppTheme.bodyFont(size: 14))
                 .foregroundColor(AppTheme.muted)
                 .lineLimit(2)
 
             HStack(spacing: 8) {
                 Text(dateString(for: dream.createdAt))
-                    .font(.system(size: 11, weight: .semibold, design: .default))
+                    .font(AppTheme.capsFont(size: 11, weight: .semibold))
                     .foregroundColor(AppTheme.muted)
                 if dream.hasComic {
-                    Text("已显化")
-                        .font(.system(size: 11, weight: .semibold, design: .default))
+                    Text("已落成")
+                        .font(AppTheme.capsFont(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.background)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
@@ -180,7 +198,7 @@ private struct DreamSummaryCard: View {
                 }
             }
         }
-        .padding(16)
+        .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 0)
                 .strokeBorder(AppTheme.surface, lineWidth: 1)
