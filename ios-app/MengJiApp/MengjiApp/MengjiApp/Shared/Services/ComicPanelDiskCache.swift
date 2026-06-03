@@ -42,7 +42,7 @@ enum ComicPanelDiskCache {
         }
     }
 
-    /// 下载完整分辨率（全屏/离线回看）。
+    /// 下载完整分辨率（离线回看；全屏展示使用降采样内存图）。
     static func persistFullPanels(artifactId: UUID, fullURLs: [URL]) async -> [String] {
         let folder = artifactId.uuidString.lowercased()
         let dir = rootDirectory().appendingPathComponent(folder, isDirectory: true)
@@ -107,22 +107,47 @@ enum ComicArtifactService {
             return fullURLs
         }()
 
-        await ComicImageLoader.shared.prefetchAll(thumbURLs)
-
-        let thumbPaths = await ComicPanelDiskCache.persistThumbs(
+        async let thumbPathsTask = ComicPanelDiskCache.persistThumbs(
             artifactId: artifactId,
             thumbURLs: thumbURLs
         )
+        async let fullPathsTask = ComicPanelDiskCache.persistFullPanels(
+            artifactId: artifactId,
+            fullURLs: fullURLs
+        )
+
+        await ComicImageLoader.shared.prefetchAll(thumbURLs)
+
+        let thumbPaths = await thumbPathsTask
+        let fullPaths = await fullPathsTask
 
         let artifact = ComicArtifact(
             id: artifactId,
             createdAt: Date(),
             styleId: styleId,
             previewDescription: previewDescription,
-            imagePaths: [],
+            imagePaths: fullPaths,
             remoteImageURLs: fullURLs,
             thumbImagePaths: thumbPaths,
             remoteThumbImageURLs: thumbURLs
+        )
+
+        await prepareForFullscreen(artifact: artifact)
+
+        return artifact
+    }
+
+    /// 预取全屏所需资源：缩略图 + 最长边 1200px 的清晰档（非 2K）。
+    @MainActor
+    @discardableResult
+    static func prepareForFullscreen(artifact: ComicArtifact) async -> ComicArtifact {
+        let previewPanels = artifact.panels(for: .preview)
+        let sharpPanels = artifact.panels(for: .fullscreen)
+
+        await ComicImageLoader.shared.prefetchAll(panels: previewPanels)
+        await ComicImageLoader.shared.prefetchAll(
+            panels: sharpPanels,
+            maxPixelEdge: ComicImageLoader.fullscreenMaxPixelEdge
         )
 
         return artifact
@@ -131,6 +156,14 @@ enum ComicArtifactService {
     @MainActor
     static func scheduleFullDownload(artifactId: UUID, dreamId: UUID?, fullURLs: [URL]) {
         Task { @MainActor in
+            if let dreamId,
+               let dream = DreamStore.shared.dream(id: dreamId),
+               let existing = dream.comicArtifacts.first(where: { $0.id == artifactId }),
+               existing.imagePaths.contains(where: { !$0.isEmpty }) {
+                await prepareForFullscreen(artifact: existing)
+                return
+            }
+
             await ComicImageLoader.shared.prefetchAll(fullURLs)
             let fullPaths = await ComicPanelDiskCache.persistFullPanels(
                 artifactId: artifactId,
@@ -138,6 +171,12 @@ enum ComicArtifactService {
             )
             guard fullPaths.contains(where: { !$0.isEmpty }) else { return }
             applyFullPaths(artifactId: artifactId, dreamId: dreamId, fullPaths: fullPaths)
+
+            if let dreamId,
+               let dream = DreamStore.shared.dream(id: dreamId),
+               let updated = dream.comicArtifacts.first(where: { $0.id == artifactId }) {
+                await prepareForFullscreen(artifact: updated)
+            }
         }
     }
 
@@ -198,7 +237,7 @@ enum ComicArtifactService {
             return artifact
         }
 
-        return ComicArtifact(
+        let updated = ComicArtifact(
             id: artifact.id,
             createdAt: artifact.createdAt,
             styleId: artifact.styleId,
@@ -208,5 +247,8 @@ enum ComicArtifactService {
             thumbImagePaths: paths.thumbPaths.contains(where: { !$0.isEmpty }) ? paths.thumbPaths : artifact.thumbImagePaths,
             remoteThumbImageURLs: thumbURLs
         )
+
+        await prepareForFullscreen(artifact: updated)
+        return updated
     }
 }

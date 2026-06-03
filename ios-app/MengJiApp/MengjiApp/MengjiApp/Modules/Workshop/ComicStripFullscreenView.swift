@@ -28,6 +28,10 @@ struct ComicStripContentView: View {
     var artifact: ComicArtifact?
     var imageQuality: ComicImageQuality = .preview
     var fallbackURLs: [URL] = []
+    /// 全屏：先 preview 再清晰档模糊→清晰
+    var useProgressiveLoading: Bool = false
+    /// 全屏关闭颗粒噪点以减轻 Canvas 开销
+    var showsFilmGrain: Bool = true
 
     private var panels: [ComicPanelDisplay] {
         if let artifact {
@@ -61,9 +65,11 @@ struct ComicStripContentView: View {
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
             }
 
-            ComicFilmGrainOverlay()
-                .opacity(0.55)
-                .allowsHitTesting(false)
+            if showsFilmGrain {
+                ComicFilmGrainOverlay()
+                    .opacity(0.55)
+                    .allowsHitTesting(false)
+            }
 
             Rectangle()
                 .strokeBorder(AppTheme.muted.opacity(0.55), lineWidth: 1)
@@ -71,9 +77,26 @@ struct ComicStripContentView: View {
         .clipped()
     }
 
+    private var previewPanelsForProgressive: [ComicPanelDisplay] {
+        guard useProgressiveLoading, let artifact else { return [] }
+        return artifact.panels(for: .preview)
+    }
+
+    private var sharpPanelsForProgressive: [ComicPanelDisplay] {
+        guard useProgressiveLoading, let artifact else { return [] }
+        return artifact.panels(for: .fullscreen)
+    }
+
     private func comicStripPanel(index: Int) -> some View {
         ZStack(alignment: .bottomTrailing) {
-            if panels.indices.contains(index - 1) {
+            if useProgressiveLoading,
+               previewPanelsForProgressive.indices.contains(index - 1),
+               sharpPanelsForProgressive.indices.contains(index - 1) {
+                ComicPanelProgressiveImage(
+                    previewPanel: previewPanelsForProgressive[index - 1],
+                    sharpPanel: sharpPanelsForProgressive[index - 1]
+                )
+            } else if panels.indices.contains(index - 1) {
                 ComicPanelImage(panel: panels[index - 1])
             } else {
                 Rectangle()
@@ -135,7 +158,8 @@ struct ComicFilmGrainOverlay: View {
 
 private struct ComicStripZoomableStrip: View {
     var artifact: ComicArtifact?
-    var imageQuality: ComicImageQuality = .full
+    var imageQuality: ComicImageQuality = .fullscreen
+    var useProgressiveLoading: Bool = false
     var fallbackURLs: [URL] = []
     var stripWidth: CGFloat
     var stripHeight: CGFloat
@@ -152,7 +176,9 @@ private struct ComicStripZoomableStrip: View {
         ComicStripContentView(
             artifact: artifact,
             imageQuality: imageQuality,
-            fallbackURLs: fallbackURLs
+            fallbackURLs: fallbackURLs,
+            useProgressiveLoading: useProgressiveLoading,
+            showsFilmGrain: false
         )
             .frame(width: stripWidth, height: stripHeight)
             .scaleEffect(zoomScale)
@@ -204,7 +230,7 @@ private struct ComicStripZoomableStrip: View {
 
 struct ComicStripFullscreenView: View {
     var artifact: ComicArtifact?
-    var imageQuality: ComicImageQuality = .full
+    var imageQuality: ComicImageQuality = .fullscreen
     var fallbackURLs: [URL] = []
     @Environment(\.dismiss) private var dismiss
     @State private var showZoomHint = true
@@ -226,6 +252,7 @@ struct ComicStripFullscreenView: View {
                         ComicStripZoomableStrip(
                             artifact: artifact,
                             imageQuality: imageQuality,
+                            useProgressiveLoading: true,
                             fallbackURLs: fallbackURLs,
                             stripWidth: stripSize.width,
                             stripHeight: stripSize.height
@@ -268,20 +295,5 @@ struct ComicStripFullscreenView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .interactiveDismissDisabled()
-        .task(id: fullscreenPrefetchKey) {
-            let panels = artifact?.panels(for: imageQuality) ?? []
-            if !panels.isEmpty {
-                await ComicImageLoader.shared.prefetchAll(panels: panels)
-            } else {
-                await ComicImageLoader.shared.prefetchAll(fallbackURLs)
-            }
-        }
-    }
-
-    private var fullscreenPrefetchKey: String {
-        if let artifact {
-            return artifact.remoteURLs(for: imageQuality).map(\.absoluteString).joined(separator: "|")
-        }
-        return fallbackURLs.map(\.absoluteString).joined(separator: "|")
     }
 }
