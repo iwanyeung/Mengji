@@ -11,10 +11,19 @@ struct InsightView: View {
     @State private var editedTitle: String = ""
     @State private var editedNote: String = ""
     @State private var editedTagsText: String = ""
+    @State private var editedOrganizedText: String = ""
+    @State private var isEditingOrganizedText = false
+    @State private var draftOrganizedText: String = ""
     @State private var showDeleteConfirmation = false
     @State private var navigateToComicResult = false
     @State private var selectedComicArtifactId: UUID?
     @State private var selectedArtifactIndexForReview: Int = 0
+    @FocusState private var organizedTextFieldFocused: Bool
+    @State private var showABitOffSheet = false
+    @State private var showUncomfortableSheet = false
+    @State private var showOrganizedSaveSheet = false
+    @State private var feedbackOptionalNote = ""
+    @State private var pendingOrganizedDraft = ""
 
     init(dreamId: UUID? = nil, appState: AppState) {
         self.dreamId = dreamId
@@ -33,8 +42,14 @@ struct InsightView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     headerSection
                     organizedTextSection
+                    if viewModel.analysisStale || viewModel.pendingSubstantialSave {
+                        analysisStaleBanner
+                    }
                     tagsSection
                     interpretationSection
+                    if viewModel.feedback == .aBitOff {
+                        aBitOffContinueBar
+                    }
                     comicSection
                     feedbackSection
                     disclaimerSection
@@ -42,10 +57,23 @@ struct InsightView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 32)
-                .padding(.bottom, 120)
+                .padding(.bottom, isEditingOrganizedText ? 40 : 120)
             }
+            .scrollDismissesKeyboard(.interactively)
 
-            bottomCTA
+            if !isEditingOrganizedText {
+                bottomCTA
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完成") {
+                    dismissOrganizedTextKeyboard()
+                }
+                .font(AppTheme.bodyFont(size: 15, weight: .semibold))
+                .foregroundColor(AppTheme.primaryColor)
+            }
         }
         .navigationDestination(isPresented: $navigateToComicResult) {
             ComicResultView(
@@ -59,6 +87,82 @@ struct InsightView: View {
                 openLatestComicIfAvailable()
                 appState.clearPendingComicOpenFlag()
             }
+            Task { await viewModel.refreshFromServer() }
+        }
+        .appToastOverlay(
+            message: $viewModel.toastMessage,
+            style: viewModel.toastStyle,
+            bottomPadding: isEditingOrganizedText ? 48 : 132
+        )
+        .sheet(isPresented: $showABitOffSheet) {
+            ABitOffFeedbackSheet(
+                optionalNote: $feedbackOptionalNote,
+                onEditNarrative: {
+                    Task { await viewModel.markABitOffSheetSeen() }
+                    startOrganizedTextEdit()
+                },
+                onReinterpretInterpretation: {
+                    Task {
+                        await viewModel.markABitOffSheetSeen()
+                        _ = await viewModel.reinterpret(
+                            mode: "default",
+                            trigger: "feedback_off",
+                            note: feedbackOptionalNote.nilIfEmpty
+                        )
+                    }
+                },
+                onReinterpretTags: {
+                    Task {
+                        await viewModel.markABitOffSheetSeen()
+                        _ = await viewModel.reinterpret(
+                            mode: "default",
+                            trigger: "feedback_off",
+                            note: feedbackOptionalNote.nilIfEmpty,
+                            updateTags: true
+                        )
+                    }
+                },
+                onDismiss: {
+                    showABitOffSheet = false
+                    Task { await viewModel.markABitOffSheetSeen() }
+                }
+            )
+        }
+        .sheet(isPresented: $showUncomfortableSheet) {
+            UncomfortableFeedbackSheet(
+                onGentlerReinterpret: {
+                    Task {
+                        _ = await viewModel.reinterpret(mode: "gentler", trigger: "feedback_uncomfortable")
+                    }
+                },
+                onCollapseInterpretation: {
+                    viewModel.setInterpretationCollapsed(true)
+                    viewModel.presentToast("已收起解读，你仍可查看梦境整理。")
+                },
+                onEditNarrative: { startOrganizedTextEdit() },
+                onDismiss: { showUncomfortableSheet = false }
+            )
+        }
+        .sheet(isPresented: $showOrganizedSaveSheet) {
+            OrganizedTextSaveSheet(
+                onSaveOnly: {
+                    showOrganizedSaveSheet = false
+                    Task {
+                        _ = await viewModel.saveOrganizedText(pendingOrganizedDraft, andReinterpret: false)
+                        dismissOrganizedTextKeyboard()
+                        isEditingOrganizedText = false
+                    }
+                },
+                onSaveAndReinterpret: {
+                    showOrganizedSaveSheet = false
+                    Task {
+                        _ = await viewModel.saveOrganizedText(pendingOrganizedDraft, andReinterpret: true)
+                        dismissOrganizedTextKeyboard()
+                        isEditingOrganizedText = false
+                    }
+                },
+                onCancel: { showOrganizedSaveSheet = false }
+            )
         }
     }
 
@@ -78,6 +182,9 @@ struct InsightView: View {
                 }
                 Spacer()
                 Button {
+                    if isEditingOrganizedText {
+                        cancelOrganizedTextEdit()
+                    }
                     prepareEditState()
                     showManageSheet = true
                 } label: {
@@ -106,14 +213,14 @@ struct InsightView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel("这一段梦给你的感觉")
 
-            Text("如果你觉得这次梦析有哪里不对劲、太刺激，或者特别有共鸣，都可以告诉梦悸。你的感受会被用来温柔地调整后续的解读。")
+            Text("你的感受会帮助梦悸调整这一条梦的解读方式；不是医疗或心理诊断。")
                 .font(AppTheme.bodyFont(size: 13))
                 .foregroundColor(AppTheme.muted)
                 .lineSpacing(4)
 
             HStack(spacing: 8) {
                 Button {
-                    viewModel.toggleFeedback(.veryClose)
+                    Task { await handleFeedbackTap(.veryClose) }
                 } label: {
                     feedbackChip(
                         text: "很贴近我",
@@ -124,7 +231,7 @@ struct InsightView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    viewModel.toggleFeedback(.aBitOff)
+                    Task { await handleFeedbackTap(.aBitOff) }
                 } label: {
                     feedbackChip(
                         text: "有点偏差",
@@ -135,7 +242,7 @@ struct InsightView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    viewModel.toggleFeedback(.uncomfortable)
+                    Task { await handleFeedbackTap(.uncomfortable) }
                 } label: {
                     feedbackChip(
                         text: "让我有点不舒服",
@@ -150,12 +257,65 @@ struct InsightView: View {
 
     private var organizedTextSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("梦境整理")
+            HStack(alignment: .center, spacing: 8) {
+                sectionLabel("梦境整理")
+                Spacer(minLength: 8)
+                if isEditingOrganizedText {
+                    Button("取消") {
+                        cancelOrganizedTextEdit()
+                    }
+                    .font(AppTheme.bodyFont(size: 13))
+                    .foregroundColor(AppTheme.muted)
+                    .buttonStyle(.plain)
 
-            Text(viewModel.current.organizedText)
-                .font(AppTheme.bodyFont(size: 16))
-                .foregroundColor(AppTheme.text.opacity(0.95))
-                .lineSpacing(6)
+                    Button("保存") {
+                        saveOrganizedTextEdit()
+                    }
+                    .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.background)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(AppTheme.primaryColor)
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        startOrganizedTextEdit()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(AppTheme.primaryColor)
+                            .frame(width: 36, height: 36)
+                            .background(AppTheme.background.opacity(0.55))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 0)
+                                    .strokeBorder(AppTheme.primaryColor.opacity(0.85), lineWidth: 1)
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("编辑梦境整理")
+                }
+            }
+
+            if isEditingOrganizedText {
+                TextEditor(text: $draftOrganizedText)
+                    .font(AppTheme.bodyFont(size: 16))
+                    .foregroundColor(AppTheme.text.opacity(0.95))
+                    .scrollContentBackground(.hidden)
+                    .focused($organizedTextFieldFocused)
+                    .frame(minHeight: 140)
+                    .padding(12)
+                    .background(AppTheme.surface.opacity(0.55))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .strokeBorder(AppTheme.muted.opacity(0.45), lineWidth: 1)
+                    )
+            } else {
+                Text(viewModel.current.organizedText)
+                    .font(AppTheme.bodyFont(size: 16))
+                    .foregroundColor(AppTheme.text.opacity(0.95))
+                    .lineSpacing(6)
+            }
         }
     }
 
@@ -169,13 +329,98 @@ struct InsightView: View {
 
     private var interpretationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("梦的可能含义")
+            HStack {
+                sectionLabel("梦的可能含义")
+                Spacer()
+                if viewModel.interpretationCollapsed {
+                    Button("展开") {
+                        viewModel.setInterpretationCollapsed(false)
+                    }
+                    .font(AppTheme.bodyFont(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.primaryColor)
+                } else {
+                    Button("收起") {
+                        viewModel.setInterpretationCollapsed(true)
+                    }
+                    .font(AppTheme.bodyFont(size: 12))
+                    .foregroundColor(AppTheme.muted)
+                }
+            }
 
-            Text(viewModel.current.interpretation)
-                .font(AppTheme.bodyFont(size: 15))
-                .foregroundColor(AppTheme.text.opacity(0.9))
-                .lineSpacing(6)
+            if viewModel.isReinterpreting {
+                ProgressView()
+                    .tint(AppTheme.primaryColor)
+                Text("正在根据你的整理更新解读…")
+                    .font(AppTheme.bodyFont(size: 13))
+                    .foregroundColor(AppTheme.muted)
+            } else if viewModel.interpretationCollapsed {
+                Text("解读已收起。需要时可点「展开」。")
+                    .font(AppTheme.bodyFont(size: 13))
+                    .foregroundColor(AppTheme.muted)
+            } else {
+                Text(viewModel.current.interpretation)
+                    .font(AppTheme.bodyFont(size: 15))
+                    .foregroundColor(
+                        viewModel.analysisStale ? AppTheme.muted : AppTheme.text.opacity(0.9)
+                    )
+                    .lineSpacing(6)
+
+                if viewModel.analysisStale {
+                    Text("基于较早版本的整理")
+                        .font(AppTheme.capsFont(size: 10, weight: .semibold))
+                        .foregroundColor(AppTheme.muted)
+                }
+            }
         }
+    }
+
+    private var analysisStaleBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("梦境整理已更新，解读可能尚未同步。")
+                .font(AppTheme.bodyFont(size: 13))
+                .foregroundColor(AppTheme.text.opacity(0.9))
+
+            Button {
+                Task {
+                    _ = await viewModel.reinterpret(mode: "default", trigger: "edit")
+                }
+            } label: {
+                Text("根据当前内容更新解读")
+                    .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.background)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.primaryColor)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 0)
+                .strokeBorder(AppTheme.primaryColor.opacity(0.5), lineWidth: 1)
+                .background(AppTheme.surface.opacity(0.35))
+        )
+    }
+
+    private var aBitOffContinueBar: some View {
+        Button {
+            showABitOffSheet = true
+        } label: {
+            HStack(spacing: 6) {
+                Text(
+                    viewModel.analysisStale
+                        ? "梦境整理已更新"
+                        : "你标记了有点偏差"
+                )
+                Text("·")
+                Text("继续调整")
+                    .underline()
+            }
+            .font(AppTheme.bodyFont(size: 12, weight: .semibold))
+            .foregroundColor(AppTheme.primaryColor)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -346,6 +591,11 @@ struct InsightView: View {
             NavigationStack {
                 VStack(spacing: 0) {
                     Form {
+                        Section("梦境整理") {
+                            TextField("修正语音转写或整理后的内容", text: $editedOrganizedText, axis: .vertical)
+                                .lineLimit(5...20)
+                        }
+
                         Section("标题与备注") {
                             TextField("梦的标题", text: $editedTitle)
                             TextField("给这条梦加一句你的注解", text: $editedNote, axis: .vertical)
@@ -383,8 +633,26 @@ struct InsightView: View {
                             viewModel.applyEdits(
                                 title: editedTitle,
                                 note: editedNote,
-                                tagsText: editedTagsText
+                                tagsText: editedTagsText,
+                                organizedText: editedOrganizedText
                             )
+                            Task {
+                                let organized = editedOrganizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !organized.isEmpty {
+                                    _ = await viewModel.saveOrganizedText(organized, andReinterpret: false)
+                                }
+                                if !editedTagsText.isEmpty {
+                                    let separators = CharacterSet(charactersIn: "，,、 ")
+                                    let tags = editedTagsText
+                                        .components(separatedBy: separators)
+                                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                        .filter { !$0.isEmpty }
+                                    try? await DreamService.shared.patchTags(dreamId: viewModel.current.id, tags: tags)
+                                }
+                            }
+                            if isEditingOrganizedText {
+                                draftOrganizedText = viewModel.current.organizedText
+                            }
                             showManageSheet = false
                         }
                         .foregroundColor(AppTheme.background)
@@ -442,6 +710,53 @@ struct InsightView: View {
         editedTitle = viewModel.current.title
         editedNote = viewModel.current.note ?? ""
         editedTagsText = viewModel.current.tags.joined(separator: "、")
+        editedOrganizedText = viewModel.current.organizedText
+    }
+
+    private func startOrganizedTextEdit() {
+        draftOrganizedText = viewModel.current.organizedText
+        isEditingOrganizedText = true
+        DispatchQueue.main.async {
+            organizedTextFieldFocused = true
+        }
+    }
+
+    private func cancelOrganizedTextEdit() {
+        draftOrganizedText = viewModel.current.organizedText
+        dismissOrganizedTextKeyboard()
+        isEditingOrganizedText = false
+    }
+
+    private func saveOrganizedTextEdit() {
+        let draft = draftOrganizedText
+        guard viewModel.applyOrganizedTextEditLocally(draft) else { return }
+        pendingOrganizedDraft = draft
+        if viewModel.pendingSubstantialSave {
+            showOrganizedSaveSheet = true
+        } else {
+            Task {
+                _ = await viewModel.saveOrganizedText(draft, andReinterpret: false)
+                dismissOrganizedTextKeyboard()
+                isEditingOrganizedText = false
+                editedOrganizedText = viewModel.current.organizedText
+            }
+        }
+    }
+
+    private func handleFeedbackTap(_ value: InsightViewModel.DreamFeedback) async {
+        let action = await viewModel.toggleFeedback(value)
+        switch action {
+        case .showABitOffSheetFirstTime:
+            showABitOffSheet = true
+        case .showUncomfortableSheet:
+            showUncomfortableSheet = true
+        default:
+            break
+        }
+    }
+
+    private func dismissOrganizedTextKeyboard() {
+        organizedTextFieldFocused = false
     }
 
     private var currentDream: Dream? {
@@ -533,6 +848,13 @@ private struct FlexibleTagWrap: View {
         let baseWidth = CGFloat(text.count) * 7.5
         let padding: CGFloat = 10 * 2 + 4 // 左右 padding + 预留
         return baseWidth + padding
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let t = trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? nil : t
     }
 }
 

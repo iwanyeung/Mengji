@@ -28,6 +28,14 @@ build/
 ### Environment / Secrets
 .env
 .env.*
+*.pem
+*.p8
+AuthKey_*.p8
+ios-app/MengJiApp/MengjiApp/Config/Debug.xcconfig
+
+### Local assets / data exports
+jimeng-*.png
+新建子用户信息.csv
 
 ### Tools / Temporary
 *.swp

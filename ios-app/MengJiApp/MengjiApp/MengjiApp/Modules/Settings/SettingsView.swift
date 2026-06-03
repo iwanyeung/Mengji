@@ -19,6 +19,7 @@ struct SettingsView: View {
 
                 List {
                     sectionAccount
+                    sectionInvite
                     sectionPersonalCenterSecurity
                     sectionProfile
                     sectionStarfield
@@ -102,7 +103,7 @@ struct SettingsView: View {
                     Text("退出登录")
                 }
             } else {
-                Text("当前为游客模式，数据仅保存在本机。登录后可编辑个人资料；个人 ID 在首次登录后由本机生成，后续可与云端对齐。")
+                Text("当前为游客模式。梦境会同步到云端，但重装后需使用 Apple 登录才能恢复历史记录。")
                     .font(AppTheme.bodyFont(size: 12))
                     .foregroundColor(AppTheme.muted)
 
@@ -134,6 +135,18 @@ struct SettingsView: View {
                         .foregroundColor(AppTheme.primaryColor)
                 }
 #endif
+            }
+        }
+    }
+
+    private var sectionInvite: some View {
+        Section("邀请体验") {
+            NavigationLink {
+                InviteRedeemView()
+            } label: {
+                Text("输入邀请码")
+                    .font(AppTheme.bodyFont(size: 15))
+                    .foregroundColor(AppTheme.text)
             }
         }
     }

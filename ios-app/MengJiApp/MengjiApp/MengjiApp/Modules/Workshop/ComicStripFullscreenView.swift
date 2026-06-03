@@ -1,33 +1,64 @@
 import SwiftUI
-import UIKit
 
 // MARK: - 布局常量（与结果页条漫一致）
 
 enum ComicStripLayout {
-    static let panelFractions: [CGFloat] = [0.22, 0.30, 0.26, 0.22]
+    static let panelCount = 4
     static let gutter: CGFloat = 2
     static let aspectHeightOverWidth: CGFloat = 2.12
+    /// 与结果页条漫区域左右留白一致
+    static let horizontalPadding: CGFloat = 24
+
+    /// 尺寸非法（首帧 GeometryReader 为 0 等）时返回 nil，避免负/非有限 frame。
+    static func stripDimensions(maxWidth: CGFloat, maxHeight: CGFloat) -> (width: CGFloat, height: CGFloat)? {
+        guard maxWidth.isFinite, maxHeight.isFinite, maxWidth > 0, maxHeight > 0 else {
+            return nil
+        }
+        let stripW = min(maxWidth, maxHeight / aspectHeightOverWidth)
+        guard stripW.isFinite, stripW > 0 else { return nil }
+        let stripH = stripW * aspectHeightOverWidth
+        guard stripH.isFinite, stripH > 0 else { return nil }
+        return (stripW, stripH)
+    }
 }
 
 // MARK: - 条漫内容（结果页与全屏共用）
 
 struct ComicStripContentView: View {
+    var artifact: ComicArtifact?
+    var imageQuality: ComicImageQuality = .preview
+    var fallbackURLs: [URL] = []
+
+    private var panels: [ComicPanelDisplay] {
+        if let artifact {
+            let resolved = artifact.panels(for: imageQuality)
+            if !resolved.isEmpty { return resolved }
+        }
+        return fallbackURLs.enumerated().map { index, url in
+            ComicPanelDisplay(index: index, remoteURL: url, localRelativePath: nil)
+        }
+    }
+
     var body: some View {
         ZStack {
             AppTheme.surface
 
             GeometryReader { geo in
                 let h = geo.size.height
-                let fractions = ComicStripLayout.panelFractions
                 let gutter = ComicStripLayout.gutter
-                let totalGutter = gutter * CGFloat(max(0, fractions.count - 1))
+                let panelCount = ComicStripLayout.panelCount
+                let totalGutter = gutter * CGFloat(max(0, panelCount - 1))
                 let contentH = max(0, h - totalGutter)
+                let panelHeight = contentH / CGFloat(panelCount)
                 VStack(spacing: gutter) {
-                    ForEach(Array(fractions.enumerated()), id: \.offset) { index, fraction in
+                    ForEach(0..<panelCount, id: \.self) { index in
                         comicStripPanel(index: index + 1)
-                            .frame(height: contentH * fraction)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: panelHeight)
+                            .clipped()
                     }
                 }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
             }
 
             ComicFilmGrainOverlay()
@@ -42,31 +73,41 @@ struct ComicStripContentView: View {
 
     private func comicStripPanel(index: Int) -> some View {
         ZStack(alignment: .bottomTrailing) {
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            AppTheme.background,
-                            index % 2 == 1
-                                ? AppTheme.primaryColor.opacity(0.16)
-                                : AppTheme.accent.opacity(0.14)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if panels.indices.contains(index - 1) {
+                ComicPanelImage(panel: panels[index - 1])
+            } else {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                AppTheme.background,
+                                index % 2 == 1
+                                    ? AppTheme.primaryColor.opacity(0.16)
+                                    : AppTheme.accent.opacity(0.14)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
 
-            Text("\(index)")
-                .font(AppTheme.capsFont(size: 11, weight: .semibold))
-                .foregroundColor(AppTheme.text.opacity(0.22))
-                .padding(8)
+            if panels.isEmpty {
+                Text("\(index)")
+                    .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.text.opacity(0.22))
+                    .padding(8)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .contentShape(Rectangle())
     }
 }
 
 // MARK: - 轻噪点（确定性 pattern）
 
-private struct ComicFilmGrainOverlay: View {
+struct ComicFilmGrainOverlay: View {
     var body: some View {
         Canvas { context, size in
             let step: CGFloat = 5
@@ -90,110 +131,71 @@ private struct ComicFilmGrainOverlay: View {
     }
 }
 
-// MARK: - 双指缩放（UIKit）
+// MARK: - 全屏双指缩放（纯 SwiftUI，与结果页同布局）
 
-struct ComicStripZoomingScrollView: UIViewRepresentable {
-    var contentWidth: CGFloat
-    var contentHeight: CGFloat
+private struct ComicStripZoomableStrip: View {
+    var artifact: ComicArtifact?
+    var imageQuality: ComicImageQuality = .full
+    var fallbackURLs: [URL] = []
+    var stripWidth: CGFloat
+    var stripHeight: CGFloat
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
+    @State private var zoomScale: CGFloat = 1
+    @State private var steadyZoomScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var steadyOffset: CGSize = .zero
+
+    private let minZoom: CGFloat = 1
+    private let maxZoom: CGFloat = 4
+
+    var body: some View {
+        ComicStripContentView(
+            artifact: artifact,
+            imageQuality: imageQuality,
+            fallbackURLs: fallbackURLs
+        )
+            .frame(width: stripWidth, height: stripHeight)
+            .scaleEffect(zoomScale)
+            .offset(offset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(magnifyGesture)
+            .simultaneousGesture(panGesture)
     }
 
-    func makeUIView(context: Context) -> UIScrollView {
-        let scroll = UIScrollView()
-        scroll.delegate = context.coordinator
-        scroll.minimumZoomScale = 1.0
-        scroll.maximumZoomScale = 4.0
-        scroll.bouncesZoom = true
-        scroll.alwaysBounceVertical = true
-        scroll.alwaysBounceHorizontal = true
-        scroll.showsVerticalScrollIndicator = true
-        scroll.showsHorizontalScrollIndicator = true
-        scroll.backgroundColor = .clear
-        scroll.delaysContentTouches = false
-        scroll.canCancelContentTouches = true
-
-        let zoomContainer = UIView()
-        zoomContainer.backgroundColor = .clear
-        zoomContainer.translatesAutoresizingMaskIntoConstraints = false
-
-        let hosting = UIHostingController(rootView: ComicStripContentView())
-        hosting.view.backgroundColor = .clear
-        hosting.view.translatesAutoresizingMaskIntoConstraints = false
-        zoomContainer.addSubview(hosting.view)
-
-        NSLayoutConstraint.activate([
-            hosting.view.topAnchor.constraint(equalTo: zoomContainer.topAnchor),
-            hosting.view.leadingAnchor.constraint(equalTo: zoomContainer.leadingAnchor),
-            hosting.view.trailingAnchor.constraint(equalTo: zoomContainer.trailingAnchor),
-            hosting.view.bottomAnchor.constraint(equalTo: zoomContainer.bottomAnchor)
-        ])
-
-        scroll.addSubview(zoomContainer)
-
-        let widthConstraint = zoomContainer.widthAnchor.constraint(equalToConstant: contentWidth)
-        let heightConstraint = zoomContainer.heightAnchor.constraint(equalToConstant: contentHeight)
-        context.coordinator.widthConstraint = widthConstraint
-        context.coordinator.heightConstraint = heightConstraint
-        context.coordinator.hosting = hosting
-        context.coordinator.zoomContainer = zoomContainer
-        context.coordinator.scrollView = scroll
-
-        NSLayoutConstraint.activate([
-            zoomContainer.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
-            zoomContainer.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
-            widthConstraint,
-            heightConstraint
-        ])
-
-        return scroll
-    }
-
-    func updateUIView(_ scrollView: UIScrollView, context: Context) {
-        guard contentWidth > 0, contentHeight > 0 else { return }
-        context.coordinator.widthConstraint?.constant = contentWidth
-        context.coordinator.heightConstraint?.constant = contentHeight
-        scrollView.layoutIfNeeded()
-        context.coordinator.applyCenteringInsets(to: scrollView)
-    }
-
-    final class Coordinator: NSObject, UIScrollViewDelegate {
-        weak var scrollView: UIScrollView?
-        weak var zoomContainer: UIView?
-        var hosting: UIHostingController<ComicStripContentView>?
-        var widthConstraint: NSLayoutConstraint?
-        var heightConstraint: NSLayoutConstraint?
-
-        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            zoomContainer
-        }
-
-        func scrollViewDidZoom(_ scrollView: UIScrollView) {
-            applyCenteringInsets(to: scrollView)
-        }
-
-        func applyCenteringInsets(to scrollView: UIScrollView) {
-            let subW = scrollView.contentSize.width
-            let subH = scrollView.contentSize.height
-            let boundsW = scrollView.bounds.width
-            let boundsH = scrollView.bounds.height
-            guard boundsW > 0, boundsH > 0 else { return }
-
-            var inset = UIEdgeInsets.zero
-            if subW < boundsW {
-                let pad = (boundsW - subW) * 0.5
-                inset.left = pad
-                inset.right = pad
+    private var magnifyGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                zoomScale = min(maxZoom, max(minZoom, steadyZoomScale * value))
             }
-            if subH < boundsH {
-                let pad = (boundsH - subH) * 0.5
-                inset.top = pad
-                inset.bottom = pad
+            .onEnded { _ in
+                steadyZoomScale = zoomScale
+                if zoomScale <= minZoom + 0.01 {
+                    resetZoom()
+                }
             }
-            scrollView.contentInset = inset
-            scrollView.verticalScrollIndicatorInsets = inset
-            scrollView.horizontalScrollIndicatorInsets = inset
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard zoomScale > minZoom + 0.01 else { return }
+                offset = CGSize(
+                    width: steadyOffset.width + value.translation.width,
+                    height: steadyOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                steadyOffset = offset
+            }
+    }
+
+    private func resetZoom() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            zoomScale = minZoom
+            steadyZoomScale = minZoom
+            offset = .zero
+            steadyOffset = .zero
         }
     }
 }
@@ -201,7 +203,11 @@ struct ComicStripZoomingScrollView: UIViewRepresentable {
 // MARK: - 全屏页
 
 struct ComicStripFullscreenView: View {
+    var artifact: ComicArtifact?
+    var imageQuality: ComicImageQuality = .full
+    var fallbackURLs: [URL] = []
     @Environment(\.dismiss) private var dismiss
+    @State private var showZoomHint = true
 
     var body: some View {
         NavigationStack {
@@ -210,15 +216,41 @@ struct ComicStripFullscreenView: View {
                     .ignoresSafeArea()
 
                 GeometryReader { geo in
-                    let horizontalPadding: CGFloat = 16
-                    let bottomBreathing: CGFloat = max(geo.safeAreaInsets.bottom, 12) + 8
-                    let availableH = max(0, geo.size.height - bottomBreathing)
-                    let maxW = geo.size.width - horizontalPadding * 2
-                    let stripW = min(maxW, availableH / ComicStripLayout.aspectHeightOverWidth)
-                    let stripH = stripW * ComicStripLayout.aspectHeightOverWidth
+                    let availableW = max(0, geo.size.width - ComicStripLayout.horizontalPadding * 2)
+                    let availableH = geo.size.height
 
-                    ComicStripZoomingScrollView(contentWidth: stripW, contentHeight: stripH)
+                    if let stripSize = ComicStripLayout.stripDimensions(
+                        maxWidth: availableW,
+                        maxHeight: availableH
+                    ) {
+                        ComicStripZoomableStrip(
+                            artifact: artifact,
+                            imageQuality: imageQuality,
+                            fallbackURLs: fallbackURLs,
+                            stripWidth: stripSize.width,
+                            stripHeight: stripSize.height
+                        )
+                    }
+
+                    if showZoomHint, geo.size.width > 0, geo.size.height > 0 {
+                        VStack {
+                            Spacer()
+                            Text("双指缩放查看细节")
+                                .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                                .foregroundColor(AppTheme.muted)
+                                .padding(.bottom, max(geo.safeAreaInsets.bottom, 20) + 12)
+                        }
                         .frame(width: geo.size.width, height: geo.size.height)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                withAnimation(.easeOut(duration: 0.35)) {
+                                    showZoomHint = false
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -236,5 +268,20 @@ struct ComicStripFullscreenView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .interactiveDismissDisabled()
+        .task(id: fullscreenPrefetchKey) {
+            let panels = artifact?.panels(for: imageQuality) ?? []
+            if !panels.isEmpty {
+                await ComicImageLoader.shared.prefetchAll(panels: panels)
+            } else {
+                await ComicImageLoader.shared.prefetchAll(fallbackURLs)
+            }
+        }
+    }
+
+    private var fullscreenPrefetchKey: String {
+        if let artifact {
+            return artifact.remoteURLs(for: imageQuality).map(\.absoluteString).joined(separator: "|")
+        }
+        return fallbackURLs.map(\.absoluteString).joined(separator: "|")
     }
 }

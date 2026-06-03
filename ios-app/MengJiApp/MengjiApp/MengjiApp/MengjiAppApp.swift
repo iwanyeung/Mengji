@@ -10,6 +10,7 @@ import UIKit
 
 @main
 struct MengjiAppApp: App {
+    @UIApplicationDelegateAdaptor(MengjiAppDelegate.self) private var appDelegate
     @State private var showSettings = false
 
     init() {
@@ -37,9 +38,11 @@ struct MengjiAppApp: App {
                         }
                     }
                 }
-            .onAppear {
-                // 仅在首次启动/空库时注入示例梦境，方便星图验证布局与交互。
+            .task {
+                await DreamSyncService.shared.syncFromServerAndWait()
+                #if DEBUG
                 DreamStore.shared.seedDemoDreamsIfNeeded()
+                #endif
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()

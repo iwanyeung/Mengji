@@ -172,6 +172,20 @@
 }
 ```
 
+失败时额外字段：
+
+```json
+{
+  "status": "failed",
+  "failureCode": "moderation_blocked",
+  "userMessage": "你的梦已经安全保存在梦悸里……",
+  "quotaRefunded": true,
+  "successfulPanelCount": 0
+}
+```
+
+`failureCode` 取值：`moderation_blocked` | `service_unavailable` | `partial_success` | `generation_failed` | `unknown_error`
+
 ## 潜意识星图
 
 ### GET /api/dreams/graph

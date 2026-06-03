@@ -3,10 +3,15 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import fs from 'fs';
 import { json } from 'express';
 import { createDreamsRouter } from './routes/dreams';
 import { createAuthRouter } from './routes/auth';
 import { createVisualsRouter } from './routes/visuals';
+import { createMeRouter } from './routes/me';
+import { createInviteRouter } from './routes/invite';
+import { env, hasCos } from './config/env';
+import { initDb } from './db';
 
 dotenv.config();
 
@@ -14,20 +19,46 @@ const app = express();
 
 app.use(helmet());
 app.use(cors());
-app.use(json());
+app.use(json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
+fs.mkdirSync(env.uploadsDir, { recursive: true });
+if (!hasCos()) {
+  app.use('/uploads', express.static(env.uploadsDir));
+}
+
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'mengji-server', version: '0.1.0' });
+  res.json({
+    status: 'ok',
+    service: 'mengji-server',
+    version: '0.3.0',
+    aiMock: env.aiMock,
+    database: env.mysqlUrl ? 'mysql' : 'sqlite',
+    storage: hasCos() ? 'cos' : 'local',
+  });
 });
 
 app.use('/api/auth', createAuthRouter());
+app.use('/api/me', createMeRouter());
+app.use('/api/invite', createInviteRouter());
 app.use('/api/dreams', createDreamsRouter());
 app.use('/api/visuals', createVisualsRouter());
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`mengji-server listening on port ${PORT}`);
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(err);
+  res.status(500).json({ error: err.message || '服务器错误' });
 });
 
+async function main(): Promise<void> {
+  await initDb();
+  app.listen(env.port, () => {
+    console.log(`mengji-server listening on port ${env.port}`);
+    console.log(`storage: ${hasCos() ? 'COS' : env.uploadsDir}`);
+    console.log(`AI mock mode: ${env.aiMock}`);
+  });
+}
+
+main().catch((err) => {
+  console.error('Failed to start server', err);
+  process.exit(1);
+});

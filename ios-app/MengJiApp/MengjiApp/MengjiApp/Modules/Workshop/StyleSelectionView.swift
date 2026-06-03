@@ -12,13 +12,13 @@ struct StyleSelectionView: View {
             id: "noir-comic",
             title: "高对比黑白 · 颗粒感四格",
             description: "像旧时代报纸上的连载漫画，用粗线条和颗粒噪点讲完一段梦。",
-            accent: .primaryColor
+            previewImageName: "StylePreviewNoir"
         ),
         WorkshopStyle(
             id: "neon-surreal",
             title: "霓虹超现实 · 拼贴四格",
             description: "颜色偏离现实，人物与场景像被剪贴在同一张夜空里。",
-            accent: .accentColor
+            previewImageName: "StylePreviewNeon"
         )
     ]
 
@@ -48,7 +48,7 @@ struct StyleSelectionView: View {
             }
         }
         .navigationDestination(isPresented: $navigateToPayment) {
-            MockPaymentView(
+            CheckoutView(
                 dreamId: dreamId,
                 styleId: selectedStyleId ?? styles.first?.id ?? "",
                 appState: appState
@@ -64,6 +64,12 @@ struct StyleSelectionView: View {
             if selectedStyleId == nil {
                 selectedStyleId = styles.first?.id
             }
+            if let dreamId {
+                Task {
+                    try? await AuthService.shared.ensureAnonymousSession()
+                    try? await DreamService.shared.prefetchStoryboard(dreamId: dreamId)
+                }
+            }
         }
     }
 
@@ -72,11 +78,14 @@ struct StyleSelectionView: View {
             Text("为这条梦选择一种落成风格。")
                 .font(AppTheme.bodyFont(size: 18, weight: .semibold))
                 .foregroundColor(AppTheme.text)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text("给这条梦选一个最合适的画面语言。")
                 .font(AppTheme.bodyFont(size: 13))
                 .foregroundColor(AppTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var bottomCTA: some View {
@@ -110,15 +119,10 @@ struct StyleSelectionView: View {
 }
 
 private struct WorkshopStyle: Identifiable {
-    enum Accent {
-        case primaryColor
-        case accentColor
-    }
-
     let id: String
     let title: String
     let description: String
-    let accent: Accent
+    let previewImageName: String
 }
 
 private struct StyleCard: View {
@@ -126,56 +130,56 @@ private struct StyleCard: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Rectangle()
-                .fill(accentColor.opacity(0.9))
-                .frame(height: 120)
-                .overlay(
-                    VStack {
-                        Text("4")
-                            .font(.system(size: 48, weight: .black, design: .default))
-                            .foregroundColor(AppTheme.background)
-                        Text("格")
-                            .font(.system(size: 14, weight: .semibold, design: .default))
-                            .foregroundColor(AppTheme.background)
-                    }
-                )
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                Image(style.previewImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
+                    .clipped()
 
-            Text(style.title)
-                .font(AppTheme.titleFont(size: 15))
-                .foregroundColor(AppTheme.text)
+                if style.id == "noir-comic" {
+                    ComicFilmGrainOverlay()
+                        .opacity(0.45)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 120)
+            .clipped()
 
-            Text(style.description)
-                .font(AppTheme.bodyFont(size: 13))
-                .foregroundColor(AppTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(style.title)
+                    .font(AppTheme.titleFont(size: 15))
+                    .foregroundColor(AppTheme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(style.description)
+                    .font(AppTheme.bodyFont(size: 13))
+                    .foregroundColor(AppTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(20)
         }
-        .padding(20)
-        .background(
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.background.opacity(0.7))
+        .clipShape(RoundedRectangle(cornerRadius: 0))
+        .overlay {
             RoundedRectangle(cornerRadius: 0)
                 .strokeBorder(
-                    isSelected ? accentColor : AppTheme.surface,
+                    isSelected ? AppTheme.primaryColor : AppTheme.surface,
                     lineWidth: isSelected ? 2 : 1
                 )
-                .background(AppTheme.background.opacity(0.7))
-        )
+        }
         .scaleEffect(isSelected ? 1.0 : 0.995)
         .shadow(
-            color: isSelected ? accentColor.opacity(0.2) : .clear,
-            radius: isSelected ? 12 : 0,
+            color: isSelected ? AppTheme.primaryColor.opacity(0.18) : .clear,
+            radius: isSelected ? 8 : 0,
             x: 0,
-            y: 3
+            y: 2
         )
         .animation(.easeInOut(duration: WorkshopMotion.selectDuration), value: isSelected)
-    }
-
-    private var accentColor: Color {
-        switch style.accent {
-        case .primaryColor:
-            return AppTheme.primaryColor
-        case .accentColor:
-            return AppTheme.accent
-        }
     }
 }
 

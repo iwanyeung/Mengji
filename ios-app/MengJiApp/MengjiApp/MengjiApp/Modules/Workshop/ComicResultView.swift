@@ -10,6 +10,7 @@ struct ComicResultView: View {
     @EnvironmentObject private var dreamStore: DreamStore
 
     @State private var isFullscreenStripPresented = false
+    @State private var fullscreenArtifact: ComicArtifact?
 
     var body: some View {
         ZStack {
@@ -38,24 +39,26 @@ struct ComicResultView: View {
                 }
 
                 GeometryReader { geometry in
-                    let maxW = geometry.size.width
-                    let maxH = geometry.size.height
-                    let stripW = min(maxW, maxH / ComicStripLayout.aspectHeightOverWidth)
-                    let stripH = stripW * ComicStripLayout.aspectHeightOverWidth
-
-                    framedStripMockStrip
-                        .frame(width: stripW, height: stripH)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if let stripSize = ComicStripLayout.stripDimensions(
+                        maxWidth: geometry.size.width,
+                        maxHeight: geometry.size.height
+                    ) {
+                        framedStripMockStrip
+                            .frame(width: stripSize.width, height: stripSize.height)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, ComicStripLayout.horizontalPadding)
                 .layoutPriority(1)
 
                 VStack(alignment: .leading, spacing: 12) {
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(
-                                "当前为占位预览。接入真实生成能力后，这里会展示根据你的梦生成的竖向分镜画面；布局可能因内容略有不同。"
+                                displayedArtifact?.remoteImageURLs.isEmpty == false
+                                    ? "根据你的梦生成的四格分镜，可全屏查看或保存。"
+                                    : "当前为占位预览。接入网络后将展示真实生成画面。"
                             )
                             .font(AppTheme.bodyFont(size: 13))
                             .foregroundColor(AppTheme.muted)
@@ -94,26 +97,69 @@ struct ComicResultView: View {
                 .padding(.bottom, 8)
             }
         }
-        .navigationTitle("四格已生成（Mock）")
+        .navigationTitle(displayedArtifact?.remoteImageURLs.isEmpty == false ? "四格已生成" : "四格预览")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $isFullscreenStripPresented) {
-            ComicStripFullscreenView()
+            ComicStripFullscreenView(
+                artifact: fullscreenArtifact,
+                imageQuality: .full
+            )
         }
+        .task(id: prefetchTaskKey) {
+            await refreshLocalCacheIfNeeded()
+            guard let artifact = displayedArtifact else { return }
+            let previewPanels = artifact.panels(for: .preview)
+            await ComicImageLoader.shared.prefetchAll(panels: previewPanels)
+            Task {
+                await ComicImageLoader.shared.prefetchAll(panels: artifact.panels(for: .full))
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshLocalCacheIfNeeded() async {
+        guard let artifact = displayedArtifact,
+              let dreamId,
+              artifact.imagePaths.allSatisfy({ $0.isEmpty }),
+              !artifact.remoteImageURLs.isEmpty else { return }
+
+        let refreshed = await ComicArtifactService.refreshLocalCache(for: artifact)
+        guard var dream = dreamStore.dream(id: dreamId),
+              let index = dream.comicArtifacts.firstIndex(where: { $0.id == refreshed.id }) else {
+            return
+        }
+        dream.comicArtifacts[index] = refreshed
+        dreamStore.upsert(dream)
+    }
+
+    private var prefetchTaskKey: String {
+        guard let artifact = displayedArtifact else { return "" }
+        let preview = artifact.remoteURLs(for: .preview).map(\.absoluteString).joined(separator: "|")
+        let local = artifact.thumbImagePaths.joined(separator: "|")
+        return "\(preview)|\(local)"
     }
 
     private var framedStripMockStrip: some View {
         ZStack(alignment: .topTrailing) {
-            ComicStripContentView()
+            ComicStripContentView(
+                artifact: displayedArtifact,
+                imageQuality: .preview
+            )
 
             Button {
+                fullscreenArtifact = displayedArtifact
                 isFullscreenStripPresented = true
             } label: {
                 Text("全屏")
                     .font(AppTheme.capsFont(size: 10, weight: .semibold))
-                    .foregroundColor(AppTheme.background)
+                    .foregroundColor(AppTheme.text)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AppTheme.muted.opacity(0.92))
+                    .background(AppTheme.surface.opacity(0.92))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .strokeBorder(AppTheme.muted.opacity(0.45), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
             .padding(10)

@@ -13,13 +13,23 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4C4E851E2FCFD63A00C4FBB5 /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Products.storekit; sourceTree = "<group>"; };
 		4C6DD1D82F67B95B00CEB39A /* MengjiApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MengjiApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C6DD2612F69909200CEB39A /* Dream.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dream.swift; sourceTree = "<group>"; };
 		4C6DD2622F69909200CEB39A /* DreamStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DreamStore.swift; sourceTree = "<group>"; };
 		4C6DD2632F69909200CEB39A /* MockAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAIService.swift; sourceTree = "<group>"; };
+		4C6DD3012F6A010000CEB39A /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		4C6DD3022F6A010000CEB39A /* Debug.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Debug.xcconfig.example; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4C4E851D2FCFCC2A00C4FBB5 /* Exceptions for "MengjiApp" folder in "MengjiApp" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Info-Additions.plist",
+			);
+			target = 4C6DD1D72F67B95B00CEB39A /* MengjiApp */;
+		};
 		4C6DD1F92F67BB5E00CEB39A /* Exceptions for "Modules" folder in "MengjiApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -32,6 +42,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Theme/AppTheme.swift,
+				Theme/AppToast.swift,
 			);
 			target = 4C6DD1D72F67B95B00CEB39A /* MengjiApp */;
 		};
@@ -40,6 +51,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4C6DD1DA2F67B95B00CEB39A /* MengjiApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4C4E851D2FCFCC2A00C4FBB5 /* Exceptions for "MengjiApp" folder in "MengjiApp" target */,
+			);
 			path = MengjiApp;
 			sourceTree = "<group>";
 		};
@@ -80,6 +94,8 @@
 		4C6DD1CF2F67B95B00CEB39A = {
 			isa = PBXGroup;
 			children = (
+				4C4E851E2FCFD63A00C4FBB5 /* Products.storekit */,
+				4C6DD3032F6A010000CEB39A /* Config */,
 				4C6DD1E62F67BA4400CEB39A /* New Group */,
 				4C6DD1DA2F67B95B00CEB39A /* MengjiApp */,
 				4C6DD1D92F67B95B00CEB39A /* Products */,
@@ -115,6 +131,15 @@
 			path = Domain;
 			sourceTree = "<group>";
 		};
+		4C6DD3032F6A010000CEB39A /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4C6DD3012F6A010000CEB39A /* Debug.xcconfig */,
+				4C6DD3022F6A010000CEB39A /* Debug.xcconfig.example */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -148,7 +173,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					4C6DD1D72F67B95B00CEB39A = {
 						CreatedOnToolsVersion = 26.3;
@@ -200,6 +225,7 @@
 /* Begin XCBuildConfiguration section */
 		4C6DD1E12F67B95C00CEB39A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4C6DD3012F6A010000CEB39A /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -323,6 +349,7 @@
 		};
 		4C6DD1E42F67B95C00CEB39A /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4C6DD3012F6A010000CEB39A /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -332,7 +359,8 @@
 				DEVELOPMENT_TEAM = 22G8NT8SD8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = "MengjiApp/Info-Additions.plist";
+				INFOPLIST_KEY_MENGJI_API_BASE = "$(MENGJI_DEV_API_BASE)";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "梦悸使用面容 ID 或触控 ID，用于在你开启「进入个人中心时验证」后，确认是本人打开个人中心与相关设置。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "梦悸需要访问麦克风，用于录制你的梦境语音并转写为文字，仅用于梦境记录与梦析功能。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "梦悸需要使用语音识别，将你说出的梦境内容实时转写为文字，方便你回看与整理，不会用于其他目的。";
@@ -370,7 +398,8 @@
 				DEVELOPMENT_TEAM = 22G8NT8SD8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = "MengjiApp/Info-Additions.plist";
+				INFOPLIST_KEY_MENGJI_API_BASE = "https://api.mengji.app";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "梦悸使用面容 ID 或触控 ID，用于在你开启「进入个人中心时验证」后，确认是本人打开个人中心与相关设置。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "梦悸需要访问麦克风，用于录制你的梦境语音并转写为文字，仅用于梦境记录与梦析功能。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "梦悸需要使用语音识别，将你说出的梦境内容实时转写为文字，方便你回看与整理，不会用于其他目的。";

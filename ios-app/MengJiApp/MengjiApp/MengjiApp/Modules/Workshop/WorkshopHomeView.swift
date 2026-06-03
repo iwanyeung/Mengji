@@ -2,11 +2,13 @@ import SwiftUI
 
 struct WorkshopHomeView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject private var jobStore = ComicGenerationJobStore.shared
     @EnvironmentObject private var dreamStore: DreamStore
     @Environment(\.openPersonalCenter) private var openPersonalCenter
 
     @State private var selectedDreamId: UUID?
     @State private var navigateToStyleSelection = false
+    @State private var navigateToComicResult = false
     @State private var showDreamPicker = false
 
     var body: some View {
@@ -16,6 +18,18 @@ struct WorkshopHomeView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
+                        ComicJobBanner(
+                            jobStore: jobStore,
+                            onViewProgress: { jobStore.reopenProgress() },
+                            onViewResult: { navigateToComicResult = true },
+                            onRetryAfterFailure: {
+                                if let payload = jobStore.failurePayload {
+                                    jobStore.clearFailureState()
+                                    appState.openWorkshop(from: payload.dreamId)
+                                }
+                            }
+                        )
+
                         header
                         selectedDreamSection
                         dreamPickerButton
@@ -27,6 +41,14 @@ struct WorkshopHomeView: View {
             }
             .navigationDestination(isPresented: $navigateToStyleSelection) {
                 StyleSelectionView(dreamId: selectedDreamId, appState: appState)
+            }
+            .navigationDestination(isPresented: $navigateToComicResult) {
+                if let artifact = jobStore.completedArtifact {
+                    ComicResultView(artifact: artifact, appState: appState)
+                        .onDisappear {
+                            jobStore.clearCompletedArtifact()
+                        }
+                }
             }
             .sheet(isPresented: $showDreamPicker) {
                 DreamSelectionView(
@@ -58,6 +80,7 @@ struct WorkshopHomeView: View {
             } else if selectedDreamId == nil {
                 selectedDreamId = dreamStore.visibleDreams().first?.id
             }
+            openComicResultIfNeeded()
         }
         .onChange(of: appState.pendingDreamIdForWorkshop) { _, newId in
             if let id = newId {
@@ -65,6 +88,19 @@ struct WorkshopHomeView: View {
                 appState.pendingDreamIdForWorkshop = nil
             }
         }
+        .onChange(of: jobStore.completedArtifact?.id) { _, _ in
+            openComicResultIfNeeded()
+        }
+        .onChange(of: jobStore.shouldAutoOpenComicResult) { _, _ in
+            openComicResultIfNeeded()
+        }
+    }
+
+    private func openComicResultIfNeeded() {
+        guard jobStore.shouldAutoOpenComicResult,
+              jobStore.completedArtifact != nil else { return }
+        navigateToComicResult = true
+        jobStore.shouldAutoOpenComicResult = false
     }
 
     private var header: some View {
@@ -169,6 +205,78 @@ struct WorkshopHomeView: View {
     }
 }
 
+private struct ComicJobBanner: View {
+    @ObservedObject var jobStore: ComicGenerationJobStore
+    var onViewProgress: () -> Void
+    var onViewResult: () -> Void
+    var onRetryAfterFailure: () -> Void
+
+    var body: some View {
+        Group {
+            if jobStore.phase == .polling, let job = jobStore.activeJob {
+                bannerCard(
+                    title: "《\(job.dreamTitle)》四格生成中 · 第 \(min(jobStore.panelProgress, 4))/4 格",
+                    subtitle: jobStore.statusMessage,
+                    actionTitle: "查看进度",
+                    action: onViewProgress
+                )
+            } else if jobStore.hasUnreadCompletion {
+                let title = jobStore.completedDreamTitle ?? "你的梦"
+                bannerCard(
+                    title: "《\(title)》四格已落成",
+                    subtitle: "点按查看这次落成的四格故事。",
+                    actionTitle: "查看四格",
+                    action: onViewResult
+                )
+            } else if jobStore.phase == .failed, let payload = jobStore.failurePayload,
+                      let dream = DreamStore.shared.dream(id: payload.dreamId) {
+                bannerCard(
+                    title: "《\(dream.title)》四格未能完整落成",
+                    subtitle: payload.userMessage,
+                    actionTitle: "重试",
+                    action: onRetryAfterFailure,
+                    accent: AppTheme.accent
+                )
+            }
+        }
+    }
+
+    private func bannerCard(
+        title: String,
+        subtitle: String,
+        actionTitle: String,
+        action: @escaping () -> Void,
+        accent: Color = AppTheme.primaryColor
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(AppTheme.bodyFont(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(subtitle)
+                .font(AppTheme.bodyFont(size: 12))
+                .foregroundColor(AppTheme.muted)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: action) {
+                Text(actionTitle)
+                    .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                    .foregroundColor(accent)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 0)
+                .strokeBorder(accent.opacity(0.45), lineWidth: 1)
+                .background(AppTheme.background.opacity(0.75))
+        )
+    }
+}
+
 private struct DreamSummaryCard: View {
     let dream: Dream
 
@@ -221,4 +329,3 @@ private struct DreamSummaryCard: View {
         return formatter.string(from: date)
     }
 }
-

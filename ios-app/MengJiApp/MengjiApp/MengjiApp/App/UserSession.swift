@@ -109,6 +109,9 @@ final class UserSessionStore: ObservableObject {
                 profile: self.session.profile
             )
             self.persist()
+            Task {
+                await AuthService.shared.syncAppleLogin(appleUserId: appleUserId)
+            }
         }
     }
 
@@ -125,6 +128,7 @@ final class UserSessionStore: ObservableObject {
     func signOut() {
         runOnMain { [weak self] in
             guard let self else { return }
+            APIClient.clearAuthToken()
             self.session = UserSession(
                 anonymousId: self.session.anonymousId,
                 isLoggedIn: false,

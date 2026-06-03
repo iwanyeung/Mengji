@@ -1,8 +1,10 @@
--- 用户表
-CREATE TABLE users (
+-- 梦悸 MySQL 8.0 建表脚本（与 server/src/db/schema.ts 一致）
+-- 用法: mysql -h <内网地址> -u mengji -p mengji < docs/schema.sql
+
+CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(64) PRIMARY KEY,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  created_at VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
   auth_provider VARCHAR(16) NOT NULL,
   device_id VARCHAR(128),
   apple_id VARCHAR(128),
@@ -12,13 +14,12 @@ CREATE TABLE users (
   color_preference VARCHAR(16)
 );
 
--- 梦境主表
-CREATE TABLE dreams (
+CREATE TABLE IF NOT EXISTS dreams (
   id VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(64) NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
-  occurred_at TIMESTAMP NOT NULL,
+  created_at VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
+  occurred_at VARCHAR(32) NOT NULL,
   source VARCHAR(16) NOT NULL,
   audio_url TEXT,
   audio_duration_seconds INT,
@@ -27,74 +28,137 @@ CREATE TABLE dreams (
   refined_narrative TEXT,
   analysis_text TEXT,
   status VARCHAR(16) NOT NULL,
-  CONSTRAINT fk_dreams_user FOREIGN KEY (user_id) REFERENCES users(id)
+  narrative_hash VARCHAR(32),
+  analysis_narrative_hash VARCHAR(32),
+  analysis_revision INT NOT NULL DEFAULT 1,
+  user_tags_locked INT NOT NULL DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE INDEX idx_dreams_user_time ON dreams (user_id, occurred_at DESC);
 
--- 分段录音
-CREATE TABLE dream_segments (
+CREATE TABLE IF NOT EXISTS dream_segments (
   id VARCHAR(64) PRIMARY KEY,
   dream_id VARCHAR(64) NOT NULL,
   segment_index INT NOT NULL,
-  created_at TIMESTAMP NOT NULL,
+  created_at VARCHAR(32) NOT NULL,
   audio_url TEXT,
   audio_duration_seconds INT,
   transcript TEXT,
-  CONSTRAINT fk_segments_dream FOREIGN KEY (dream_id) REFERENCES dreams(id)
+  device_transcript TEXT,
+  FOREIGN KEY (dream_id) REFERENCES dreams(id)
 );
 
 CREATE INDEX idx_segments_dream_index ON dream_segments (dream_id, segment_index);
 
--- 标签与关联
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(128) NOT NULL,
   category VARCHAR(32) NOT NULL,
-  created_at TIMESTAMP NOT NULL
+  created_at VARCHAR(32) NOT NULL
 );
 
 CREATE UNIQUE INDEX idx_tags_name_category ON tags (name, category);
 
-CREATE TABLE dream_tags (
+CREATE TABLE IF NOT EXISTS dream_tags (
   id VARCHAR(64) PRIMARY KEY,
   dream_id VARCHAR(64) NOT NULL,
   tag_id VARCHAR(64) NOT NULL,
-  relevance_score NUMERIC(4, 3) NOT NULL,
-  CONSTRAINT fk_dream_tags_dream FOREIGN KEY (dream_id) REFERENCES dreams(id),
-  CONSTRAINT fk_dream_tags_tag FOREIGN KEY (tag_id) REFERENCES tags(id)
+  relevance_score DOUBLE NOT NULL,
+  FOREIGN KEY (dream_id) REFERENCES dreams(id),
+  FOREIGN KEY (tag_id) REFERENCES tags(id)
 );
 
-CREATE INDEX idx_dream_tags_dream ON dream_tags (dream_id);
-CREATE INDEX idx_dream_tags_tag ON dream_tags (tag_id);
-
--- 显化作品
-CREATE TABLE dream_visuals (
+CREATE TABLE IF NOT EXISTS dream_visuals (
   id VARCHAR(64) PRIMARY KEY,
   dream_id VARCHAR(64) NOT NULL,
+  user_id VARCHAR(64) NOT NULL,
   type VARCHAR(32) NOT NULL,
   style_key VARCHAR(64) NOT NULL,
   status VARCHAR(32) NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP NOT NULL,
+  created_at VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
   image_url TEXT,
+  image_urls_json TEXT,
+  seedream_call_count INT DEFAULT 0,
+  successful_panel_count INT DEFAULT 0,
+  estimated_cost_cny DOUBLE DEFAULT 0,
   failure_reason TEXT,
-  CONSTRAINT fk_visuals_dream FOREIGN KEY (dream_id) REFERENCES dreams(id)
+  failure_code VARCHAR(64),
+  used_free_quota INT DEFAULT 0,
+  narrative_hash_at_gen VARCHAR(32),
+  FOREIGN KEY (dream_id) REFERENCES dreams(id)
 );
 
-CREATE INDEX idx_visuals_dream_type ON dream_visuals (dream_id, type);
+CREATE TABLE IF NOT EXISTS dream_comic_storyboards (
+  dream_id VARCHAR(64) NOT NULL,
+  style_key VARCHAR(64) NOT NULL,
+  panels_json TEXT NOT NULL,
+  narrative_hash VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
+  PRIMARY KEY (dream_id, style_key),
+  FOREIGN KEY (dream_id) REFERENCES dreams(id)
+);
 
--- 潜意识星图相似度边
-CREATE TABLE similarity_edges (
+CREATE TABLE IF NOT EXISTS dream_analysis_feedback (
+  dream_id VARCHAR(64) PRIMARY KEY,
+  feedback VARCHAR(32),
+  optional_note TEXT,
+  a_bit_off_sheet_seen INT NOT NULL DEFAULT 0,
+  interpretation_revision INT DEFAULT 1,
+  handled_at VARCHAR(32),
+  updated_at VARCHAR(32) NOT NULL,
+  FOREIGN KEY (dream_id) REFERENCES dreams(id)
+);
+
+CREATE TABLE IF NOT EXISTS payment_orders (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  dream_id VARCHAR(64) NOT NULL,
+  visual_id VARCHAR(64),
+  product_id VARCHAR(128) NOT NULL,
+  apple_transaction_id VARCHAR(128) NOT NULL UNIQUE,
+  apple_original_transaction_id VARCHAR(128),
+  environment VARCHAR(16) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  verified_at VARCHAR(32) NOT NULL,
+  created_at VARCHAR(32) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+  id VARCHAR(64) PRIMARY KEY,
+  code VARCHAR(32) NOT NULL UNIQUE,
+  batch_name VARCHAR(64) NOT NULL DEFAULT 'beta-100',
+  channel_label VARCHAR(128),
+  free_comic_quota INT NOT NULL DEFAULT 10,
+  status VARCHAR(16) NOT NULL,
+  redeemed_by_user_id VARCHAR(64),
+  redeemed_at VARCHAR(32),
+  created_at VARCHAR(32) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_comic_entitlements (
+  user_id VARCHAR(64) PRIMARY KEY,
+  invite_code_id VARCHAR(64),
+  free_comics_total INT NOT NULL DEFAULT 0,
+  free_comics_used INT NOT NULL DEFAULT 0,
+  paid_comics_generated INT NOT NULL DEFAULT 0,
+  updated_at VARCHAR(32) NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS similarity_edges (
   id VARCHAR(64) PRIMARY KEY,
   dream_id_a VARCHAR(64) NOT NULL,
   dream_id_b VARCHAR(64) NOT NULL,
-  score NUMERIC(4, 3) NOT NULL,
+  score DOUBLE NOT NULL,
   shared_tag_ids TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  CONSTRAINT fk_edges_dream_a FOREIGN KEY (dream_id_a) REFERENCES dreams(id),
-  CONSTRAINT fk_edges_dream_b FOREIGN KEY (dream_id_b) REFERENCES dreams(id)
+  created_at VARCHAR(32) NOT NULL
 );
 
-CREATE INDEX idx_edges_dream_pair ON similarity_edges (dream_id_a, dream_id_b);
-
+CREATE TABLE IF NOT EXISTS usage_daily (
+  user_id VARCHAR(64) NOT NULL,
+  day VARCHAR(10) NOT NULL,
+  dream_analysis_count INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day)
+);

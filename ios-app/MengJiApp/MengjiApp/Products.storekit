@@ -1,0 +1,43 @@
+{
+  "identifier" : "Products",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  },
+  "consumables" : [
+    {
+      "displayPrice" : "8",
+      "familyShareable" : false,
+      "internalID" : "mengji_four_panel_once",
+      "localizations" : [
+        {
+          "description" : "将一条梦境 AI 生成为四格漫画",
+          "displayName" : "显化四格漫画",
+          "locale" : "zh_Hans"
+        }
+      ],
+      "productID" : "com.mengji.visual.four_panel_once",
+      "referenceName" : "四格漫画单次生成",
+      "type" : "Consumable"
+    }
+  ]
+}

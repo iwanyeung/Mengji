@@ -7,20 +7,28 @@ struct RecordingAuroraBackground: View {
 
     @State private var pulseScale: CGFloat = 1
 
+    private var auroraActive: Bool {
+        viewModel.auroraMotionAllowed && !viewModel.organizingAuroraCalm
+    }
+
     var body: some View {
         ZStack {
             AppTheme.background
 
-            if viewModel.auroraMotionAllowed {
+            if auroraActive {
                 SoftAuroraMetalBackgroundView(
                     pulseBoost: max(0, pulseScale - 1),
                     isPaused: reduceMotion,
                     motionAllowed: true
                 )
             }
+
+            if viewModel.organizingAuroraCalm {
+                AppTheme.background.opacity(0.72)
+            }
         }
         .onChange(of: viewModel.auroraPulseToken) { _, _ in
-            guard viewModel.auroraMotionAllowed, !reduceMotion else { return }
+            guard auroraActive, !reduceMotion else { return }
             let t = Transaction(animation: nil)
             withTransaction(t) {
                 pulseScale = 1.14

@@ -5,14 +5,14 @@
 ### 仓库结构
 
 - `ios-app/`：iOS 客户端（Swift + SwiftUI），包含底部四个 Tab：「录梦 / 梦析 / 显化工坊 / 潜意识星图」。
-- `server/`：后端服务（TypeScript + Node.js + Express），封装 See Dance 能力并对 iOS 暴露 REST API。
+- `server/`：后端服务（TypeScript + Node.js + Express），封装 DeepSeek / Seedream / 豆包语音并对 iOS 暴露 REST API。
 - `docs/`：产品文档（如 `docs/PRD.md`）。
 
 ### 技术栈约定
 
 - **iOS**：Swift 5+，SwiftUI，MVVM 风格；后续可根据需要演进为 TCA。
-- **Server**：Node 20+，TypeScript，Express；后续可根据规模演进为 NestJS 或微服务架构。
-- **部署**：后端部署在腾讯云（CVM / Serverless 均可），通过 HTTPS 对外提供 API；所有 See Dance 调用仅在服务端进行。
+- **Server**：Node 20+，TypeScript，Express；DeepSeek + 火山 Seedream/豆包语音，见 `server/README.md`。
+- **部署**：后端部署在腾讯云（CVM / Serverless 均可），通过 HTTPS 对外提供 API；所有 AI 调用仅在服务端进行。
 
 ### 快速开始（占位）
 

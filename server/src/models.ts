@@ -63,6 +63,13 @@ export type VisualType = 'four_panel_comic' | 'poster' | 'animation_10s';
 
 export type VisualStatus = 'pending_payment' | 'queued' | 'generating' | 'succeeded' | 'failed';
 
+export type VisualFailureCode =
+  | 'moderation_blocked'
+  | 'service_unavailable'
+  | 'partial_success'
+  | 'generation_failed'
+  | 'unknown_error';
+
 export interface DreamVisual {
   id: string;
   dreamId: string;
@@ -73,6 +80,7 @@ export interface DreamVisual {
   updatedAt: Date;
   imageUrl?: string;
   failureReason?: string;
+  failureCode?: VisualFailureCode;
 }
 
 export interface SimilarityEdge {

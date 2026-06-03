@@ -48,6 +48,18 @@ struct RecordingView: View {
             viewModel.onFinishRecording = onFinishRecording
             viewModel.refreshAuroraPolicy()
         }
+        .fullScreenCover(isPresented: $viewModel.isProcessingDream) {
+            DreamOrganizingView(
+                segmentCount: viewModel.organizingSegmentTotal,
+                uploadedSegmentIndex: viewModel.organizingUploadedCount,
+                phase: viewModel.organizingPhase,
+                statusMessage: viewModel.organizingStatusMessage,
+                showsSuccess: viewModel.organizingShowsSuccess,
+                errorMessage: viewModel.processingError,
+                onRetry: { viewModel.finishAllSegments() },
+                onCancel: { viewModel.dismissOrganizing() }
+            )
+        }
     }
 
     private var header: some View {
@@ -240,17 +252,20 @@ struct RecordingView: View {
     private var finishButton: some View {
         Group {
             if !viewModel.segments.isEmpty && !viewModel.isRecording {
-                Button {
-                    viewModel.finishAllSegments()
-                } label: {
-                    Text("完成并整理")
-                        .font(AppTheme.capsFont(size: 12, weight: .semibold))
-                        .textCase(.uppercase)
-                        .kerning(1.5)
-                        .foregroundColor(AppTheme.background)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(AppTheme.primaryColor)
+                VStack(spacing: 8) {
+                    Button {
+                        viewModel.finishAllSegments()
+                    } label: {
+                        Text(viewModel.isProcessingDream ? "整理中…" : "完成并整理")
+                            .font(AppTheme.capsFont(size: 12, weight: .semibold))
+                            .textCase(.uppercase)
+                            .kerning(1.5)
+                            .foregroundColor(AppTheme.background)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 10)
+                            .background(AppTheme.primaryColor)
+                    }
+                    .disabled(viewModel.isProcessingDream)
                 }
             }
         }

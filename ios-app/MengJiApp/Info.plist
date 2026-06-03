@@ -36,6 +36,10 @@
 	<string>梦悸需要访问麦克风，用于录制你的梦境语音并转写为文字，仅用于梦境记录与梦析功能。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>梦悸需要使用语音识别，将你说出的梦境内容实时转写为文字，方便你回看与整理，不会用于其他目的。</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>梦悸会在四格漫画生成完成后通知你，无需一直停留在等待页面。</string>
+	<key>MENGJI_API_BASE</key>
+	<string>https://api.mengji.app</string>
 </dict>
 </plist>
 

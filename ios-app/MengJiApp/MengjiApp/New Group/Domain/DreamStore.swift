@@ -6,38 +6,53 @@ final class DreamStore: ObservableObject {
 
     @Published private(set) var dreams: [Dream] = []
 
-    private let queue = DispatchQueue(label: "dream.store.queue")
+    private enum Keys {
+        static let cache = "mengji.dreams.cache"
+    }
 
-    private init() {}
+    private let defaults = UserDefaults.standard
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    private init() {
+        loadFromDisk()
+    }
 
     func upsert(_ dream: Dream) {
-        queue.async {
-            DispatchQueue.main.async {
-                if let index = self.dreams.firstIndex(where: { $0.id == dream.id }) {
-                    self.dreams[index] = dream
-                } else {
-                    self.dreams.insert(dream, at: 0)
-                }
+        applyOnMain {
+            if let index = self.dreams.firstIndex(where: { $0.id == dream.id }) {
+                self.dreams[index] = dream
+            } else {
+                self.dreams.insert(dream, at: 0)
             }
+            self.persistToDisk()
+        }
+    }
+
+    /// 将服务端梦境合并进本地：服务端为准，保留尚未上传的本地-only 梦境。
+    func mergeFromServer(_ serverDreams: [Dream]) {
+        applyOnMain {
+            let serverIds = Set(serverDreams.map(\.id))
+            let localOnly = self.dreams.filter { !serverIds.contains($0.id) }
+            self.dreams = (serverDreams + localOnly).sorted { $0.createdAt > $1.createdAt }
+            self.persistToDisk()
         }
     }
 
     func delete(id: UUID) {
-        queue.async {
-            DispatchQueue.main.async {
-                self.dreams.removeAll { $0.id == id }
-            }
+        applyOnMain {
+            self.dreams.removeAll { $0.id == id }
+            self.persistToDisk()
         }
     }
 
     func archive(id: UUID) {
-        queue.async {
-            DispatchQueue.main.async {
-                guard let index = self.dreams.firstIndex(where: { $0.id == id }) else { return }
-                var updated = self.dreams[index]
-                updated.isArchived = true
-                self.dreams[index] = updated
-            }
+        applyOnMain {
+            guard let index = self.dreams.firstIndex(where: { $0.id == id }) else { return }
+            var updated = self.dreams[index]
+            updated.isArchived = true
+            self.dreams[index] = updated
+            self.persistToDisk()
         }
     }
 
@@ -49,5 +64,23 @@ final class DreamStore: ObservableObject {
     func visibleDreams() -> [Dream] {
         dreams.filter { !$0.isArchived }
     }
-}
 
+    private func loadFromDisk() {
+        guard let data = defaults.data(forKey: Keys.cache),
+              let decoded = try? decoder.decode([Dream].self, from: data) else { return }
+        dreams = decoded
+    }
+
+    private func persistToDisk() {
+        guard let data = try? encoder.encode(dreams) else { return }
+        defaults.set(data, forKey: Keys.cache)
+    }
+
+    private func applyOnMain(_ block: @escaping () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
+    }
+}
