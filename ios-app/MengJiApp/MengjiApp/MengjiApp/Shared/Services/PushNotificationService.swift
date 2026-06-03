@@ -121,6 +121,10 @@ final class PushNotificationService: NSObject {
     private func visualId(from userInfo: [AnyHashable: Any]) -> String? {
         userInfo["visualId"] as? String
     }
+
+    func hasVisualPayload(_ userInfo: [AnyHashable: Any]) -> Bool {
+        visualId(from: userInfo) != nil
+    }
 }
 
 extension PushNotificationService: UNUserNotificationCenterDelegate {
@@ -145,15 +149,29 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
 final class MengjiAppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+        didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         MainActor.assumeIsolated {
             PushNotificationService.shared.configure()
-            if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
-                PushNotificationService.shared.enqueueRemoteNotification(userInfo, openResult: true)
-            }
         }
+        // iOS 26+：launchOptions[.remoteNotification] 已弃用；点按通知由
+        // UNUserNotificationCenterDelegate.didReceive 处理，后台推送见下方 fetchCompletionHandler。
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        Task { @MainActor in
+            await PushNotificationService.shared.handleRemoteNotification(
+                userInfo: userInfo,
+                openResult: false
+            )
+            let hasPayload = PushNotificationService.shared.hasVisualPayload(userInfo)
+            completionHandler(hasPayload ? .newData : .noData)
+        }
     }
 
     func application(
