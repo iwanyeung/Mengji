@@ -833,55 +833,6 @@ private struct ContinuousRippleRingsLocal: View {
     }
 }
 
-// MARK: - 流式布局（iOS 16 Layout 协议，单遍布局，无 GeometryReader / @State 二次刷新）
-
-private struct TagFlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        flowResult(in: proposal.replacingUnspecifiedDimensions().width, subviews: subviews).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = flowResult(in: bounds.width, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private struct FlowResult {
-        var positions: [CGPoint] = []
-        var size: CGSize = .zero
-    }
-
-    private func flowResult(in maxWidth: CGFloat, subviews: Subviews) -> FlowResult {
-        var result = FlowResult()
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var lineH: CGFloat = 0
-        var maxX: CGFloat = 0
-
-        for subview in subviews {
-            let sz = subview.sizeThatFits(.unspecified)
-            if x + sz.width > maxWidth, x > 0 {
-                y += lineH + spacing
-                x = 0
-                lineH = 0
-            }
-            result.positions.append(CGPoint(x: x, y: y))
-            x += sz.width + spacing
-            lineH = max(lineH, sz.height)
-            maxX = max(maxX, x - spacing)
-        }
-
-        result.size = CGSize(width: maxX, height: y + lineH)
-        return result
-    }
-}
-
 /// 流式标签组件（用于 sheet 关键词区）。
 private struct WrapView: View {
     let tags: [String]
@@ -897,6 +848,8 @@ private struct WrapView: View {
     private func tagView(tag: String) -> some View {
         Text(tag)
             .font(.system(size: 11, weight: .semibold, design: .default))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundColor(AppTheme.muted)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)

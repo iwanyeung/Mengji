@@ -86,21 +86,10 @@ final class InsightViewModel: ObservableObject {
 
             var dream = DreamStore.shared.dream(id: dreamId)
             if dream == nil {
-                dream = Dream(
-                    id: dreamId,
-                    createdAt: Date(),
-                    rawTranscript: detail.rawTranscript ?? "",
-                    organizedText: detail.refinedNarrative ?? "",
-                    interpretation: detail.analysisText ?? "",
-                    tags: detail.tags?.map(\.name) ?? [],
-                    title: String((detail.refinedNarrative ?? "未命名梦境").prefix(24)),
-                    note: nil,
-                    isArchived: false,
-                    comicArtifacts: []
-                )
+                dream = DreamService.shared.dream(from: detail)
             }
 
-            var updated = dream!
+            guard var updated = dream else { return }
             DreamService.shared.applyServerDetail(detail, to: &updated)
             DreamStore.shared.upsert(updated)
             applyDreamState(updated)

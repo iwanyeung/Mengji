@@ -16,6 +16,11 @@ import {
   type DreamFeedbackType,
 } from '../services/dreamInsight';
 import { prefetchStoryboardsForDream, ensureStoryboard } from '../services/comicStoryboardCache';
+import {
+  markDreamAnalyzedPushSent,
+  sendDreamAnalyzedPush,
+  shouldSendDreamAnalyzedPush,
+} from '../services/apns';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -63,6 +68,7 @@ async function dreamToResponse(dreamId: string) {
     status: dream.status,
     refinedNarrative: dream.refined_narrative,
     analysisText: dream.analysis_text,
+    title: dream.title ?? null,
     rawTranscript: dream.raw_transcript,
     narrativeHash,
     analysisNarrativeHash,
@@ -111,8 +117,8 @@ export function createDreamsRouter(): Router {
   router.get('/search', requireAuth, async (req, res) => {
     const q = String(req.query.q || '').trim();
     const rows = await getDb().query(
-      `SELECT id, refined_narrative, occurred_at FROM dreams WHERE user_id = ? AND (refined_narrative LIKE ? OR raw_transcript LIKE ?) ORDER BY occurred_at DESC LIMIT 50`,
-      [req.auth!.userId, `%${q}%`, `%${q}%`],
+      `SELECT id, refined_narrative, title, occurred_at FROM dreams WHERE user_id = ? AND (refined_narrative LIKE ? OR raw_transcript LIKE ? OR title LIKE ?) ORDER BY occurred_at DESC LIMIT 50`,
+      [req.auth!.userId, `%${q}%`, `%${q}%`, `%${q}%`],
     );
     res.json({ dreams: rows });
   });
@@ -296,6 +302,15 @@ export function createDreamsRouter(): Router {
 
     try {
       await finalizeDreamRecording(dreamId, req.auth!.userId);
+      const userId = req.auth!.userId;
+      if (await shouldSendDreamAnalyzedPush(dreamId)) {
+        try {
+          await sendDreamAnalyzedPush(userId, dreamId);
+          await markDreamAnalyzedPushSent(dreamId);
+        } catch (e) {
+          console.warn('[apns] dream_analyzed push failed:', e);
+        }
+      }
       res.json({ id: dreamId, status: 'analyzed' });
     } catch (e) {
       const msg = e instanceof Error ? e.message : '整理失败';

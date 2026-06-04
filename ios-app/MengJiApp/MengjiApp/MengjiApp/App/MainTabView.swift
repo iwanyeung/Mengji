@@ -10,6 +10,8 @@ struct MainTabView: View {
     @StateObject private var dreamStore = DreamStore.shared
     @ObservedObject private var jobStore = ComicGenerationJobStore.shared
     @State private var recordingBlurTitleReplayToken: UInt = 0
+    @State private var watchToastMessage: String?
+    @State private var watchToastStyle: AppToastStyle = .info
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -57,11 +59,13 @@ struct MainTabView: View {
         .tint(AppTheme.primaryColor)
         .preferredColorScheme(.dark)
         .environmentObject(dreamStore)
-        .appToastOverlay(message: $jobStore.toastMessage, style: .success, bottomPadding: 96)
+        .appToastOverlay(message: jobStoreToastDisplay, style: .success, placement: .top)
+        .appToastOverlay(message: $watchToastMessage, style: watchToastStyle, placement: .top)
         .fullScreenCover(isPresented: $jobStore.isShowingFullScreenCover) {
             ComicGeneratingView(
                 dreamTitle: jobStore.activeJob?.dreamTitle ?? "",
                 panelCount: jobStore.panelProgress,
+                panelThumbUrls: jobStore.partialThumbUrls,
                 statusMessage: jobStore.statusMessage,
                 onMinimize: { jobStore.minimize() }
             )
@@ -106,7 +110,22 @@ struct MainTabView: View {
                 break
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .watchDreamSegmentReceived)) { notification in
+            let index = (notification.userInfo?["segmentIndex"] as? Int) ?? 0
+            let segmentNumber = index + 1
+            presentWatchToast("已收到手表录音第 \(segmentNumber) 段，可在录梦页继续添加或整理", style: .info)
+            appState.selectedTab = .recording
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .watchDreamIngestFailed)) { notification in
+            let message = (notification.userInfo?["message"] as? String) ?? "手表录梦整理失败"
+            presentWatchToast(message, style: .error)
+        }
         .task {
+            jobStore.onComicGenerationSucceeded = { dreamId in
+                appState.pendingDreamIdForWorkshop = dreamId
+                appState.selectedTab = .workshop
+            }
+            WatchDreamIngestService.shared.activate()
             PushNotificationService.shared.onVisualPush = { visualId in
                 appState.selectedTab = .workshop
                 if let dreamId = ComicGenerationJobStore.shared.activeJob?.dreamId {
@@ -115,10 +134,34 @@ struct MainTabView: View {
                     await refreshWorkshopDreamForVisual(visualId: visualId, appState: appState)
                 }
             }
+            PushNotificationService.shared.onDreamAnalyzedPush = { dreamId in
+                appState.openInsightAfterRecording(dreamId: dreamId)
+            }
             jobStore.refreshPendingIfNeeded()
             await PushNotificationService.shared.processPendingPushIfNeeded()
             await PushNotificationService.shared.requestAuthorizationIfNeeded()
         }
+    }
+
+    private func presentWatchToast(_ message: String, style: AppToastStyle) {
+        watchToastStyle = style
+        watchToastMessage = message
+    }
+
+    /// 梦作间已有落成 Banner 时，不再重复展示底部完成 Toast（方案 D）。
+    private var jobStoreToastDisplay: Binding<String?> {
+        Binding(
+            get: {
+                guard let message = jobStore.toastMessage else { return nil }
+                if message == ComicGenerationJobStore.comicCompletionToast,
+                   appState.selectedTab == .workshop,
+                   jobStore.hasUnreadCompletion {
+                    return nil
+                }
+                return message
+            },
+            set: { jobStore.toastMessage = $0 }
+        )
     }
 
     private func refreshWorkshopDreamForVisual(visualId: String, appState: AppState) async {

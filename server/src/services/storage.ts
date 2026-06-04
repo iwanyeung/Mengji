@@ -8,6 +8,8 @@ import type { ComicPanelRef } from './comicImageUrls';
 
 const COMIC_THUMB_MAX_EDGE = 768;
 const COMIC_THUMB_JPEG_QUALITY = 82;
+/** 全图统一转 JPEG 存储，避免大 PNG 拖慢上传/客户端下载（1280x720 漫画用 JPEG 体积更小且画质足够）。 */
+const COMIC_FULL_JPEG_QUALITY = 92;
 
 let cosClient: COS | null = null;
 
@@ -105,8 +107,22 @@ export async function saveComicPanelUpload(
   subdir: string,
 ): Promise<ComicPanelRef> {
   const id = uuidv4();
-  const fullKey = `${subdir}/${id}.png`.replace(/\\/g, '/');
   const thumbKey = `${subdir}/${id}_thumb.jpg`.replace(/\\/g, '/');
+
+  // 全图统一转 JPEG（体积远小于 PNG，加快上传与客户端下载）；转码失败则回退原始字节与 .png。
+  let fullBuffer: Buffer;
+  let fullExt = 'jpg';
+  try {
+    fullBuffer = await sharp(buffer)
+      .rotate()
+      .jpeg({ quality: COMIC_FULL_JPEG_QUALITY, mozjpeg: true })
+      .toBuffer();
+  } catch (err) {
+    console.warn('[storage] full jpeg encode failed, storing original bytes', err);
+    fullBuffer = buffer;
+    fullExt = 'png';
+  }
+  const fullKey = `${subdir}/${id}.${fullExt}`.replace(/\\/g, '/');
 
   let thumbBuffer: Buffer;
   try {
@@ -120,15 +136,15 @@ export async function saveComicPanelUpload(
       .toBuffer();
   } catch (err) {
     console.warn('[storage] thumb generation failed, using full image as thumb', err);
-    thumbBuffer = buffer;
+    thumbBuffer = fullBuffer;
   }
 
   if (hasCos()) {
-    await cosPutObject(fullKey, buffer);
+    await cosPutObject(fullKey, fullBuffer);
     await cosPutObject(thumbKey, thumbBuffer);
   } else {
     for (const [key, body] of [
-      [fullKey, buffer],
+      [fullKey, fullBuffer],
       [thumbKey, thumbBuffer],
     ] as const) {
       const absolute = path.join(env.uploadsDir, key);

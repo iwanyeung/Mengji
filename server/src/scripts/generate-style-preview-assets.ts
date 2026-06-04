@@ -11,6 +11,9 @@ const OUT_DIR = path.resolve(
   '../../../ios-app/MengJiApp/MengjiApp/MengjiApp/Assets.xcassets',
 );
 
+/** 风格预览图固定竖版 3:4（与 prompt 的 vertical poster 3:4 一致），不随四格漫画的 16:9 默认尺寸变化。 */
+const STYLE_PREVIEW_SIZE = '1728x2304';
+
 const STYLES = [
   {
     name: 'StylePreviewNoir',
@@ -34,7 +37,7 @@ async function fetchSeedreamImage(prompt: string): Promise<Buffer> {
     body: JSON.stringify({
       model: env.arkImageModel,
       prompt: prompt.slice(0, 500),
-      size: env.seedreamImageSize,
+      size: STYLE_PREVIEW_SIZE,
       n: 1,
       response_format: 'url',
     }),

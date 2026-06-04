@@ -44,10 +44,14 @@ struct WorkshopHomeView: View {
             }
             .navigationDestination(isPresented: $navigateToComicResult) {
                 if let artifact = jobStore.completedArtifact {
-                    ComicResultView(artifact: artifact, appState: appState)
-                        .onDisappear {
-                            jobStore.clearCompletedArtifact()
-                        }
+                    ComicResultView(
+                        dreamId: dreamId(for: artifact),
+                        artifact: artifact,
+                        appState: appState
+                    )
+                    .onDisappear {
+                        jobStore.clearCompletedArtifact()
+                    }
                 }
             }
             .sheet(isPresented: $showDreamPicker) {
@@ -101,6 +105,12 @@ struct WorkshopHomeView: View {
               jobStore.completedArtifact != nil else { return }
         navigateToComicResult = true
         jobStore.shouldAutoOpenComicResult = false
+    }
+
+    private func dreamId(for artifact: ComicArtifact) -> UUID? {
+        dreamStore.visibleDreams().first(where: { dream in
+            dream.comicArtifacts.contains(where: { $0.id == artifact.id })
+        })?.id
     }
 
     private var header: some View {

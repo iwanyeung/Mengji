@@ -137,6 +137,45 @@ enum ComicArtifactService {
         return artifact
     }
 
+    /// 快速构建：仅下载缩略图并预热预览，立即可在结果页展示；全分辨率/全屏资源由调用方在后台下载。
+    @MainActor
+    static func buildFast(
+        styleId: String,
+        previewDescription: String,
+        fullURLStrings: [String],
+        thumbURLStrings: [String]? = nil,
+        artifactId: UUID = UUID()
+    ) async -> ComicArtifact {
+        let fullURLs = fullURLStrings.compactMap { URL(string: $0) }
+        let thumbURLs: [URL] = {
+            if let thumbURLStrings, !thumbURLStrings.isEmpty {
+                return thumbURLStrings.compactMap { URL(string: $0) }
+            }
+            return fullURLs
+        }()
+
+        let thumbPaths = await ComicPanelDiskCache.persistThumbs(
+            artifactId: artifactId,
+            thumbURLs: thumbURLs
+        )
+
+        let artifact = ComicArtifact(
+            id: artifactId,
+            createdAt: Date(),
+            styleId: styleId,
+            previewDescription: previewDescription,
+            imagePaths: [],
+            remoteImageURLs: fullURLs,
+            thumbImagePaths: thumbPaths,
+            remoteThumbImageURLs: thumbURLs
+        )
+
+        // 预热预览缩略图（小而快），让结果页立即出图。
+        await ComicImageLoader.shared.prefetchAll(panels: artifact.panels(for: .preview))
+
+        return artifact
+    }
+
     /// 预取全屏所需资源：缩略图 + 最长边 1200px 的清晰档（非 2K）。
     @MainActor
     @discardableResult

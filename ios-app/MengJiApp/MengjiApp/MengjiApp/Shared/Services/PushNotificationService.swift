@@ -6,11 +6,14 @@ import UserNotifications
 final class PushNotificationService: NSObject {
     static let shared = PushNotificationService()
 
-    /// MainTabView 注入：收到四格推送后切 Tab。
+    /// 收到四格推送后切 Tab / 刷新梦作间
     var onVisualPush: ((String) async -> Void)?
+    /// 收到梦析完成推送后打开梦析
+    var onDreamAnalyzedPush: ((UUID) async -> Void)?
 
     private var didRequestAuthorization = false
     private let pendingVisualIdKey = "com.mengji.pendingPushVisualId"
+    private let pendingDreamIdKey = "com.mengji.pendingPushDreamId"
     private let pendingOpenResultKey = "com.mengji.pendingPushOpenResult"
 
     private override init() {
@@ -21,24 +24,36 @@ final class PushNotificationService: NSObject {
         UNUserNotificationCenter.current().delegate = self
     }
 
-    /// 冷启动或未就绪时暂存推送，待 MainTabView 就绪后 drain。
     func enqueueRemoteNotification(_ userInfo: [AnyHashable: Any], openResult: Bool) {
-        guard let visualId = visualId(from: userInfo) else { return }
-        UserDefaults.standard.set(visualId, forKey: pendingVisualIdKey)
+        if let visualId = visualId(from: userInfo) {
+            UserDefaults.standard.set(visualId, forKey: pendingVisualIdKey)
+        } else if let dreamId = dreamId(from: userInfo) {
+            UserDefaults.standard.set(dreamId.uuidString, forKey: pendingDreamIdKey)
+        } else {
+            return
+        }
         if openResult {
             UserDefaults.standard.set(true, forKey: pendingOpenResultKey)
         }
     }
 
     func processPendingPushIfNeeded() async {
-        guard let visualId = UserDefaults.standard.string(forKey: pendingVisualIdKey) else { return }
         let openResult = UserDefaults.standard.bool(forKey: pendingOpenResultKey)
-        UserDefaults.standard.removeObject(forKey: pendingVisualIdKey)
-        UserDefaults.standard.removeObject(forKey: pendingOpenResultKey)
-        await handleRemoteNotification(
-            userInfo: ["visualId": visualId],
-            openResult: openResult
-        )
+        if let visualId = UserDefaults.standard.string(forKey: pendingVisualIdKey) {
+            UserDefaults.standard.removeObject(forKey: pendingVisualIdKey)
+            UserDefaults.standard.removeObject(forKey: pendingOpenResultKey)
+            await handleRemoteNotification(userInfo: ["type": "visual_done", "visualId": visualId], openResult: openResult)
+            return
+        }
+        if let dreamRaw = UserDefaults.standard.string(forKey: pendingDreamIdKey),
+           let dreamId = UUID(uuidString: dreamRaw) {
+            UserDefaults.standard.removeObject(forKey: pendingDreamIdKey)
+            UserDefaults.standard.removeObject(forKey: pendingOpenResultKey)
+            await handleRemoteNotification(
+                userInfo: ["type": "dream_analyzed", "dreamId": dreamId.uuidString.lowercased()],
+                openResult: openResult
+            )
+        }
     }
 
     func requestAuthorizationIfNeeded() async {
@@ -103,23 +118,57 @@ final class PushNotificationService: NSObject {
     }
 
     func handleRemoteNotification(userInfo: [AnyHashable: Any], openResult: Bool = false) async {
-        guard let visualId = visualId(from: userInfo) else { return }
+        let pushType = (userInfo["type"] as? String) ?? (visualId(from: userInfo) != nil ? "visual_done" : nil)
 
-        if let onVisualPush {
-            await onVisualPush(visualId)
-        } else {
-            enqueueRemoteNotification(userInfo, openResult: openResult)
-            return
+        switch pushType {
+        case "dream_analyzed":
+            guard let dreamId = dreamId(from: userInfo) else { return }
+            WatchNotificationBridge.shared.notifyDreamAnalyzed(dreamId: dreamId)
+            if openResult, let onDreamAnalyzedPush {
+                await onDreamAnalyzedPush(dreamId)
+            } else if onDreamAnalyzedPush == nil {
+                enqueueRemoteNotification(userInfo, openResult: openResult)
+            }
+        case "visual_done", "visual_failed":
+            guard let visualId = visualId(from: userInfo) else { return }
+            let dreamId = dreamId(from: userInfo)
+            if let dreamId {
+                WatchNotificationBridge.shared.notifyComicReady(visualId: visualId, dreamId: dreamId)
+            }
+            if let onVisualPush {
+                await onVisualPush(visualId)
+            } else {
+                enqueueRemoteNotification(userInfo, openResult: openResult)
+                return
+            }
+            await ComicGenerationJobStore.shared.ingestRemoteVisual(
+                visualId: visualId,
+                openResultAutomatically: openResult
+            )
+        default:
+            if let visualId = visualId(from: userInfo) {
+                await handleRemoteNotification(
+                    userInfo: ["type": "visual_done", "visualId": visualId],
+                    openResult: openResult
+                )
+            }
         }
-
-        await ComicGenerationJobStore.shared.ingestRemoteVisual(
-            visualId: visualId,
-            openResultAutomatically: openResult
-        )
     }
 
     private func visualId(from userInfo: [AnyHashable: Any]) -> String? {
         userInfo["visualId"] as? String
+    }
+
+    private func dreamId(from userInfo: [AnyHashable: Any]) -> UUID? {
+        guard let raw = userInfo["dreamId"] as? String else { return nil }
+        return UUID(uuidString: raw)
+    }
+
+    func hasActionablePayload(_ userInfo: [AnyHashable: Any]) -> Bool {
+        if let type = userInfo["type"] as? String, type == "dream_analyzed" {
+            return dreamId(from: userInfo) != nil
+        }
+        return visualId(from: userInfo) != nil
     }
 
     func hasVisualPayload(_ userInfo: [AnyHashable: Any]) -> Bool {
@@ -132,9 +181,17 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        let userInfo = notification.request.content.userInfo
+        let content = notification.request.content
+        let userInfo = content.userInfo
         await handleRemoteNotification(userInfo: userInfo, openResult: false)
-        return [.banner, .sound]
+
+        await MainActor.run {
+            MengjiPushBannerPresenter.show(
+                title: content.title.isEmpty ? "梦悸" : content.title,
+                body: content.body
+            )
+        }
+        return [.sound]
     }
 
     nonisolated func userNotificationCenter(
@@ -153,9 +210,9 @@ final class MengjiAppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         MainActor.assumeIsolated {
             PushNotificationService.shared.configure()
+            WatchCompanionDiagnostics.logInstalledBundleState()
+            WatchDreamIngestService.shared.activate()
         }
-        // iOS 26+：launchOptions[.remoteNotification] 已弃用；点按通知由
-        // UNUserNotificationCenterDelegate.didReceive 处理，后台推送见下方 fetchCompletionHandler。
         return true
     }
 
@@ -169,7 +226,7 @@ final class MengjiAppDelegate: NSObject, UIApplicationDelegate {
                 userInfo: userInfo,
                 openResult: false
             )
-            let hasPayload = PushNotificationService.shared.hasVisualPayload(userInfo)
+            let hasPayload = PushNotificationService.shared.hasActionablePayload(userInfo)
             completionHandler(hasPayload ? .newData : .noData)
         }
     }

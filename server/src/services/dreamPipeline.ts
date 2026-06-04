@@ -8,6 +8,7 @@ import { scanTranscriptRisk, appendRiskNotice } from './contentSafety';
 import { readUpload, writeTempFile } from './storage';
 import { computeNarrativeHash } from '../utils/narrativeHash';
 import { prefetchStoryboardsForDream } from './comicStoryboardCache';
+import { formatDreamTitle } from '../utils/dreamTitle';
 import fs from 'fs';
 
 export async function finalizeDreamRecording(dreamId: string, userId: string): Promise<void> {
@@ -62,12 +63,14 @@ export async function finalizeDreamRecording(dreamId: string, userId: string): P
   const analysisText = risk.riskFlag
     ? appendRiskNotice(analysis.analysisText, risk.message)
     : analysis.analysisText;
+  const dreamTitle = formatDreamTitle(analysis.titlePhrase);
   const narrativeHash = computeNarrativeHash(analysis.refinedNarrative);
   await db.execute(
-    `UPDATE dreams SET refined_narrative = ?, analysis_text = ?, status = ?, updated_at = ?, narrative_hash = ?, analysis_narrative_hash = ?, analysis_revision = 1 WHERE id = ?`,
+    `UPDATE dreams SET refined_narrative = ?, analysis_text = ?, title = ?, status = ?, updated_at = ?, narrative_hash = ?, analysis_narrative_hash = ?, analysis_revision = 1 WHERE id = ?`,
     [
       analysis.refinedNarrative,
       analysisText,
+      dreamTitle,
       'analyzed',
       nowIso(),
       narrativeHash,

@@ -38,6 +38,15 @@ struct RecordingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(AppTheme.background.opacity(0.2), for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if !viewModel.segments.isEmpty {
+                    Button("新一场梦") {
+                        viewModel.beginNewDreamSession()
+                    }
+                    .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.muted)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 ProfileNavButton(style: .compact) {
                     openPersonalCenter()
@@ -47,6 +56,7 @@ struct RecordingView: View {
         .onAppear {
             viewModel.onFinishRecording = onFinishRecording
             viewModel.refreshAuroraPolicy()
+            viewModel.reloadSegmentsFromSession()
         }
         .fullScreenCover(isPresented: $viewModel.isProcessingDream) {
             DreamOrganizingView(
@@ -80,6 +90,14 @@ struct RecordingView: View {
         GeometryReader { proxy in
             let reservedBottom = finishButtonReservedBottom + proxy.safeAreaInsets.bottom
             List {
+                if let banner = viewModel.draftBannerText {
+                    Text(banner)
+                        .font(AppTheme.bodyFont(size: 12))
+                        .foregroundColor(AppTheme.primaryColor)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+
                 // 当前录制中的实时转写
                 if viewModel.isRecording && !viewModel.liveTranscript.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -105,14 +123,26 @@ struct RecordingView: View {
 
                 // 片段列表
                 ForEach(Array(viewModel.segments.enumerated()), id: \.element.id) { index, segment in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 10) {
-                            // 第 1 行：日期 + 梦段编号
-                            Text(title(for: segment, at: index))
-                                .foregroundColor(AppTheme.text.opacity(0.9))
-                                .font(AppTheme.bodyFont(size: 14, weight: .semibold))
+                    HStack(alignment: .top, spacing: 12) {
+                        Button {
+                            viewModel.setSegmentSelected(id: segment.id, selected: !segment.isSelected)
+                        } label: {
+                            Image(systemName: segment.isSelected ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundColor(segment.isSelected ? AppTheme.primaryColor : AppTheme.muted)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 2)
 
-                            // 第 2 行：转写摘要
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Text(title(for: segment, at: index))
+                                    .foregroundColor(AppTheme.text.opacity(0.9))
+                                    .font(AppTheme.bodyFont(size: 14, weight: .semibold))
+                                recordingSourceIcon(for: segment.source)
+                            }
+
+                            // 第 2 行：转写摘要（title 已移到 HStack）
                             Text(preview(for: segment))
                                 .foregroundColor(AppTheme.text.opacity(0.9))
                                 .font(AppTheme.bodyFont(size: 16))
@@ -251,7 +281,7 @@ struct RecordingView: View {
 
     private var finishButton: some View {
         Group {
-            if !viewModel.segments.isEmpty && !viewModel.isRecording {
+            if viewModel.hasSelectedSegments && !viewModel.isRecording {
                 VStack(spacing: 8) {
                     Button {
                         viewModel.finishAllSegments()
@@ -295,7 +325,17 @@ struct RecordingView: View {
         return "\(dayString) · 梦段 \(String(format: "%02d", position))"
     }
 
+    private func recordingSourceIcon(for source: DreamRecordingDraftSource) -> some View {
+        Image(systemName: source == .watch ? "applewatch" : "iphone")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(AppTheme.primaryColor)
+            .accessibilityLabel(source == .watch ? "手表录音" : "手机录音")
+    }
+
     private func preview(for segment: RecordingViewModel.Segment) -> String {
+        if segment.source == .watch, segment.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "（手表录音，整理时自动转写）"
+        }
         let text = segment.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return "（这一段主要是沉默或环境声）" }
         let limit = 16

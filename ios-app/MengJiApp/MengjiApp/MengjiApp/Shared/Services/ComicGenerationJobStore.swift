@@ -28,10 +28,16 @@ enum ComicJobPhase: String, Codable {
 @MainActor
 final class ComicGenerationJobStore: ObservableObject {
     static let shared = ComicGenerationJobStore()
+    static let comicCompletionToast = "四格已落成，可在梦作间查看"
+
+    /// 四格落成后切到梦作间并预选梦境（由 MainTabView 注入）。
+    var onComicGenerationSucceeded: ((UUID) -> Void)?
 
     @Published private(set) var activeJob: PendingComicJob?
     @Published private(set) var phase: ComicJobPhase = .idle
     @Published var panelProgress = 0
+    /// 生成中逐格缩略图 URL（未完成的格为 nil），用于流式展示已画好的格子
+    @Published private(set) var partialThumbUrls: [String?] = []
     @Published var statusMessage = ""
     @Published var isShowingFullScreenCover = false
     @Published var completedArtifact: ComicArtifact?
@@ -44,6 +50,7 @@ final class ComicGenerationJobStore: ObservableObject {
 
     private var pollTask: Task<Void, Never>?
     private var comfortTask: Task<Void, Never>?
+    private var toastDismissTask: Task<Void, Never>?
     private var isAppInForeground = true
 
     private let storageKey = "com.mengji.pendingComicJob"
@@ -80,9 +87,23 @@ final class ComicGenerationJobStore: ObservableObject {
         !isBusy
     }
 
+    func showToast(_ message: String, duration: TimeInterval = 2.5) {
+        toastDismissTask?.cancel()
+        toastMessage = message
+        let expected = message
+        toastDismissTask = Task {
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            if toastMessage == expected {
+                toastMessage = nil
+            }
+        }
+    }
+
     func beginSubmission() {
         phase = .submitting
         panelProgress = 0
+        partialThumbUrls = []
         statusMessage = "正在准备…"
         failurePayload = nil
         showFailureCover = false
@@ -116,6 +137,7 @@ final class ComicGenerationJobStore: ObservableObject {
         persist(job)
         phase = .polling
         panelProgress = 0
+        partialThumbUrls = []
         statusMessage = "正在绘制四格漫画…"
         if showProgress {
             isShowingFullScreenCover = true
@@ -229,7 +251,7 @@ final class ComicGenerationJobStore: ObservableObject {
                 statusMessage = "连接暂时中断，稍后会继续同步…"
                 return
             }
-            toastMessage = error.localizedDescription
+            showToast(error.localizedDescription)
         }
     }
 
@@ -305,7 +327,7 @@ final class ComicGenerationJobStore: ObservableObject {
             return
         }
 
-        toastMessage = error.localizedDescription
+        showToast(error.localizedDescription)
         phase = .failed
         isShowingFullScreenCover = false
         clearPersistedJob()
@@ -323,6 +345,11 @@ final class ComicGenerationJobStore: ObservableObject {
         panelProgress = detail.successfulPanelCount ?? panelProgress
         if (detail.successfulPanelCount ?? 0) > 0 {
             statusMessage = "正在绘制第 \(min(detail.successfulPanelCount ?? 0, 4))/4 格…"
+        }
+        if let partial = detail.imageThumbUrlsPartial {
+            partialThumbUrls = partial
+        } else if let thumbs = detail.imageThumbUrls, !thumbs.isEmpty {
+            partialThumbUrls = thumbs.map { Optional($0) }
         }
         ComicImageLoader.shared.prefetch(urls: detail.prefetchableThumbImageURLs)
         if detail.status == "succeeded" {
@@ -376,7 +403,8 @@ final class ComicGenerationJobStore: ObservableObject {
             return UUID()
         }()
 
-        let artifact = await ComicArtifactService.build(
+        // 仅落盘缩略图并预热预览，立即可显示；全分辨率与全屏资源放到后台下载，不阻塞结果展示。
+        let artifact = await ComicArtifactService.buildFast(
             styleId: styleId,
             previewDescription: "基于梦境生成的四格漫画",
             fullURLStrings: urls,
@@ -404,10 +432,14 @@ final class ComicGenerationJobStore: ObservableObject {
         clearPersistedJob()
         isShowingFullScreenCover = false
         panelProgress = 4
+        partialThumbUrls = []
         statusMessage = "四格已落成"
-        toastMessage = "四格已落成，可在梦作间查看"
+        shouldAutoOpenComicResult = true
+        onComicGenerationSucceeded?(dreamId)
+        showToast(Self.comicCompletionToast)
 
         if let visualId {
+            WatchNotificationBridge.shared.notifyComicReady(visualId: visualId, dreamId: dreamId)
             persistUnreadCompletion(
                 UnreadComicCompletion(
                     visualId: visualId,
@@ -444,6 +476,7 @@ final class ComicGenerationJobStore: ObservableObject {
         isShowingFullScreenCover = false
         showFailureCover = true
         shouldAutoOpenComicResult = false
+        partialThumbUrls = []
 
         Analytics.track("workshop_comic_failure", properties: [
             "dreamId": dreamId.uuidString,

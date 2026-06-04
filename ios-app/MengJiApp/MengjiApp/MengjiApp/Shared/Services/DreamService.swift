@@ -27,6 +27,7 @@ struct ServerDreamDetail: Decodable {
     let status: String
     let refinedNarrative: String?
     let analysisText: String?
+    let title: String?
     let rawTranscript: String?
     let narrativeHash: String?
     let analysisNarrativeHash: String?
@@ -84,7 +85,7 @@ struct DreamService {
         return formatter
     }()
 
-    func createDream(id: UUID, occurredAt: Date = Date()) async throws {
+    func createDream(id: UUID, occurredAt: Date = Date(), source: String = "iphone") async throws {
         try await AuthService.shared.ensureAnonymousSession()
         struct Body: Encodable {
             let id: String
@@ -96,7 +97,7 @@ struct DreamService {
         let _: Resp = try await APIClient.shared.request(
             "POST",
             path: "api/dreams",
-            body: Body(id: id.uuidString.lowercased(), occurredAt: iso, source: "iphone")
+            body: Body(id: id.uuidString.lowercased(), occurredAt: iso, source: source)
         )
     }
 
@@ -140,14 +141,19 @@ struct DreamService {
         guard let id = UUID(uuidString: detail.id) else { return nil }
         let createdAt = parseServerDate(detail.occurredAt) ?? Date()
         let narrative = detail.refinedNarrative ?? ""
+        let tags = detail.tags?.map(\.name) ?? []
         var dream = Dream(
             id: id,
             createdAt: createdAt,
             rawTranscript: detail.rawTranscript ?? "",
             organizedText: narrative,
             interpretation: detail.analysisText ?? "",
-            tags: detail.tags?.map(\.name) ?? [],
-            title: String((narrative.isEmpty ? "未命名梦境" : narrative).prefix(24)),
+            tags: tags,
+            title: DreamTitleFormatter.resolve(
+                serverTitle: detail.title,
+                narrative: narrative,
+                tags: tags
+            ),
             note: nil,
             isArchived: false,
             comicArtifacts: []
@@ -258,6 +264,13 @@ struct DreamService {
         }
         if let serverTags = detail.tags?.map(\.name), !serverTags.isEmpty {
             dream.tags = serverTags
+        }
+        if let serverTitle = detail.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !serverTitle.isEmpty {
+            if dream.title.isEmpty
+                || DreamTitleFormatter.isLegacyAutoTitle(dream.title, narrative: dream.organizedText) {
+                dream.title = serverTitle
+            }
         }
         dream.analysisStale = detail.analysisStale ?? false
 

@@ -5,18 +5,32 @@ import SwiftUI
 enum ComicStripLayout {
     static let panelCount = 4
     static let gutter: CGFloat = 2
-    static let aspectHeightOverWidth: CGFloat = 2.12
+    /// 单格固定 16:9（高 / 宽）。生成端也按 16:9 出图时，scaledToFill 不会裁切，完整平铺。
+    static let panelHeightOverWidth: CGFloat = 9.0 / 16.0
     /// 与结果页条漫区域左右留白一致
     static let horizontalPadding: CGFloat = 24
 
+    /// 四格之间的总间隙高度
+    static var totalGutter: CGFloat {
+        gutter * CGFloat(max(0, panelCount - 1))
+    }
+
+    /// 整条 高/宽（不含间隙的近似比例，供需要估算处使用）
+    static var aspectHeightOverWidth: CGFloat {
+        panelHeightOverWidth * CGFloat(panelCount)
+    }
+
     /// 尺寸非法（首帧 GeometryReader 为 0 等）时返回 nil，避免负/非有限 frame。
+    /// 高度受限时优先保证每格严格 16:9，整条按可用区域取最大宽度并居中。
     static func stripDimensions(maxWidth: CGFloat, maxHeight: CGFloat) -> (width: CGFloat, height: CGFloat)? {
         guard maxWidth.isFinite, maxHeight.isFinite, maxWidth > 0, maxHeight > 0 else {
             return nil
         }
-        let stripW = min(maxWidth, maxHeight / aspectHeightOverWidth)
+        let panelsHeightPerWidth = panelHeightOverWidth * CGFloat(panelCount)
+        let widthLimitedByHeight = (maxHeight - totalGutter) / panelsHeightPerWidth
+        let stripW = min(maxWidth, widthLimitedByHeight)
         guard stripW.isFinite, stripW > 0 else { return nil }
-        let stripH = stripW * aspectHeightOverWidth
+        let stripH = stripW * panelsHeightPerWidth + totalGutter
         guard stripH.isFinite, stripH > 0 else { return nil }
         return (stripW, stripH)
     }
@@ -229,11 +243,15 @@ private struct ComicStripZoomableStrip: View {
 // MARK: - 全屏页
 
 struct ComicStripFullscreenView: View {
-    var artifact: ComicArtifact?
+    let artifact: ComicArtifact
     var imageQuality: ComicImageQuality = .fullscreen
     var fallbackURLs: [URL] = []
     @Environment(\.dismiss) private var dismiss
     @State private var showZoomHint = true
+
+    private var hasDisplayablePanels: Bool {
+        !artifact.panels(for: .preview).isEmpty || !fallbackURLs.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -241,43 +259,10 @@ struct ComicStripFullscreenView: View {
                 Color.black
                     .ignoresSafeArea()
 
-                GeometryReader { geo in
-                    let availableW = max(0, geo.size.width - ComicStripLayout.horizontalPadding * 2)
-                    let availableH = geo.size.height
-
-                    if let stripSize = ComicStripLayout.stripDimensions(
-                        maxWidth: availableW,
-                        maxHeight: availableH
-                    ) {
-                        ComicStripZoomableStrip(
-                            artifact: artifact,
-                            imageQuality: imageQuality,
-                            useProgressiveLoading: true,
-                            fallbackURLs: fallbackURLs,
-                            stripWidth: stripSize.width,
-                            stripHeight: stripSize.height
-                        )
-                    }
-
-                    if showZoomHint, geo.size.width > 0, geo.size.height > 0 {
-                        VStack {
-                            Spacer()
-                            Text("双指缩放查看细节")
-                                .font(AppTheme.capsFont(size: 11, weight: .semibold))
-                                .foregroundColor(AppTheme.muted)
-                                .padding(.bottom, max(geo.safeAreaInsets.bottom, 20) + 12)
-                        }
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .allowsHitTesting(false)
-                        .transition(.opacity)
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation(.easeOut(duration: 0.35)) {
-                                    showZoomHint = false
-                                }
-                            }
-                        }
-                    }
+                if hasDisplayablePanels {
+                    stripContent
+                } else {
+                    unavailableContent
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -295,5 +280,59 @@ struct ComicStripFullscreenView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .interactiveDismissDisabled()
+    }
+
+    private var stripContent: some View {
+        GeometryReader { geo in
+            let availableW = max(0, geo.size.width - ComicStripLayout.horizontalPadding * 2)
+            let availableH = geo.size.height
+
+            if let stripSize = ComicStripLayout.stripDimensions(
+                maxWidth: availableW,
+                maxHeight: availableH
+            ) {
+                ComicStripZoomableStrip(
+                    artifact: artifact,
+                    imageQuality: imageQuality,
+                    useProgressiveLoading: true,
+                    fallbackURLs: fallbackURLs,
+                    stripWidth: stripSize.width,
+                    stripHeight: stripSize.height
+                )
+            }
+
+            if showZoomHint, geo.size.width > 0, geo.size.height > 0 {
+                VStack {
+                    Spacer()
+                    Text("双指缩放查看细节")
+                        .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.muted)
+                        .padding(.bottom, max(geo.safeAreaInsets.bottom, 20) + 12)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation(.easeOut(duration: 0.35)) {
+                            showZoomHint = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var unavailableContent: some View {
+        VStack(spacing: 16) {
+            Text("四格暂时无法全屏查看")
+                .font(AppTheme.bodyFont(size: 15, weight: .semibold))
+                .foregroundColor(AppTheme.text)
+            Text("请返回结果页稍后再试。")
+                .font(AppTheme.bodyFont(size: 13))
+                .foregroundColor(AppTheme.muted)
+        }
+        .padding(.horizontal, 32)
+        .multilineTextAlignment(.center)
     }
 }

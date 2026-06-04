@@ -323,8 +323,28 @@ struct InsightView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionLabel("关键词与意象")
 
-            FlexibleTagWrap(tags: viewModel.current.tags)
+            TagFlowLayout(spacing: 8, maxRows: 2) {
+                ForEach(viewModel.current.tags, id: \.self) { tag in
+                    insightKeywordTag(tag)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func insightKeywordTag(_ tag: String) -> some View {
+        Text(tag)
+            .font(AppTheme.bodyFont(size: 12))
+            .foregroundColor(AppTheme.text.opacity(0.9))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 999)
+                    .strokeBorder(AppTheme.surface, lineWidth: 1)
+                    .background(AppTheme.background.opacity(0.4))
+            )
     }
 
     private var interpretationSection: some View {
@@ -785,69 +805,6 @@ struct InsightView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "yyyy.MM.dd HH:mm"
         return formatter.string(from: date)
-    }
-}
-
-private struct TagWrapWidthPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 340
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct FlexibleTagWrap: View {
-    let tags: [String]
-    @State private var containerWidth: CGFloat = 340
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(rows(maxWidth: containerWidth), id: \.self) { row in
-                HStack(spacing: 8) {
-                    ForEach(row, id: \.self) { tag in
-                        Text(tag)
-                            .font(AppTheme.bodyFont(size: 12))
-                            .foregroundColor(AppTheme.text.opacity(0.9))
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 999)
-                                    .strokeBorder(AppTheme.surface, lineWidth: 1)
-                                    .background(AppTheme.background.opacity(0.4))
-                            )
-                    }
-                }
-            }
-        }
-        .background(
-            GeometryReader { proxy in
-                Color.clear.preference(key: TagWrapWidthPreferenceKey.self, value: proxy.size.width)
-            }
-        )
-        .onPreferenceChange(TagWrapWidthPreferenceKey.self) { containerWidth = $0 }
-    }
-
-    private func rows(maxWidth: CGFloat) -> [[String]] {
-        var rows: [[String]] = [[]]
-        var currentRowWidth: CGFloat = 0
-
-        for tag in tags {
-            let tagWidth = estimateTagWidth(tag)
-            if currentRowWidth + tagWidth > maxWidth {
-                rows.append([tag])
-                currentRowWidth = tagWidth
-            } else {
-                rows[rows.count - 1].append(tag)
-                currentRowWidth += tagWidth
-            }
-        }
-
-        return rows
-    }
-
-    private func estimateTagWidth(_ text: String) -> CGFloat {
-        let baseWidth = CGFloat(text.count) * 7.5
-        let padding: CGFloat = 10 * 2 + 4 // 左右 padding + 预留
-        return baseWidth + padding
     }
 }
 

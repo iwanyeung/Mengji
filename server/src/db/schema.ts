@@ -25,6 +25,7 @@ export const SCHEMA_STATEMENTS = [
     segments_combined_transcript TEXT,
     refined_narrative TEXT,
     analysis_text TEXT,
+    title TEXT,
     status VARCHAR(16) NOT NULL,
     narrative_hash VARCHAR(32),
     analysis_narrative_hash VARCHAR(32),
@@ -182,6 +183,8 @@ export const SCHEMA_MIGRATION_STATEMENTS = [
   `ALTER TABLE dream_visuals ADD COLUMN narrative_hash_at_gen VARCHAR(32)`,
   `ALTER TABLE dream_visuals ADD COLUMN failure_code VARCHAR(64)`,
   `ALTER TABLE dream_visuals ADD COLUMN push_sent_at VARCHAR(32)`,
+  `ALTER TABLE dreams ADD COLUMN title TEXT`,
+  `ALTER TABLE dreams ADD COLUMN push_sent_at VARCHAR(32)`,
 ];
 
 export const MYSQL_INDEX_STATEMENTS = [

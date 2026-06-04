@@ -28,6 +28,11 @@ enum AppToastStyle {
     }
 }
 
+enum AppToastPlacement {
+    case top
+    case bottom
+}
+
 struct AppToast: View {
     let message: String
     var style: AppToastStyle = .info
@@ -60,18 +65,25 @@ struct AppToast: View {
 private struct AppToastOverlayModifier: ViewModifier {
     @Binding var message: String?
     var style: AppToastStyle
-    var bottomPadding: CGFloat
+    var placement: AppToastPlacement
+    var edgePadding: CGFloat
+    var autoDismissSeconds: TimeInterval
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .bottom) {
+            .overlay(alignment: placement == .top ? .top : .bottom) {
                 if let message {
                     AppToast(message: message, style: style)
                         .padding(.horizontal, 24)
-                        .padding(.bottom, bottomPadding)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        .padding(placement == .top ? .top : .bottom, edgePadding)
+                        .transition(
+                            .move(edge: placement == .top ? .top : .bottom)
+                                .combined(with: .opacity)
+                        )
+                        .task(id: message) {
+                            let expected = message
+                            try? await Task.sleep(for: .seconds(autoDismissSeconds))
+                            if self.message == expected {
                                 self.message = nil
                             }
                         }
@@ -85,14 +97,32 @@ extension View {
     func appToastOverlay(
         message: Binding<String?>,
         style: AppToastStyle = .info,
-        bottomPadding: CGFloat = 132
+        placement: AppToastPlacement = .top,
+        edgePadding: CGFloat = 12,
+        autoDismissSeconds: TimeInterval = 2.5
     ) -> some View {
         modifier(
             AppToastOverlayModifier(
                 message: message,
                 style: style,
-                bottomPadding: bottomPadding
+                placement: placement,
+                edgePadding: edgePadding,
+                autoDismissSeconds: autoDismissSeconds
             )
+        )
+    }
+
+    /// 兼容梦析页等仍使用底部 Toast 的调用方。
+    func appToastOverlay(
+        message: Binding<String?>,
+        style: AppToastStyle = .info,
+        bottomPadding: CGFloat
+    ) -> some View {
+        appToastOverlay(
+            message: message,
+            style: style,
+            placement: .bottom,
+            edgePadding: bottomPadding
         )
     }
 }

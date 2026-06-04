@@ -45,7 +45,7 @@ async function testSeedream(): Promise<boolean> {
       body: JSON.stringify({
         model: env.arkImageModel,
         prompt: 'dreamy surreal forest, soft golden light, test panel',
-        size: '2K',
+        size: env.seedreamImageSize,
         n: 1,
         response_format: 'url',
       }),

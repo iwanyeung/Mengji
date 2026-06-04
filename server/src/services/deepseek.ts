@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { env, hasDeepSeek } from '../config/env';
+import { deriveTitlePhrase, resolveTitlePhrase } from '../utils/dreamTitle';
 
 let client: OpenAI | null = null;
 
@@ -16,6 +17,8 @@ function getClient(): OpenAI {
 export interface DreamAnalysisResult {
   refinedNarrative: string;
   analysisText: string;
+  /** 4–12 字意象短语，用于「关于「…」的夜里」标题 */
+  titlePhrase: string;
   tags: Array<{ name: string; category: string }>;
   keywords: string[];
   riskFlag?: boolean;
@@ -31,7 +34,15 @@ export interface ComicPanelPrompt {
 const SYSTEM_PROMPT = `你是梦悸 App 的梦境整理助手。用温柔陪伴的口吻，帮助用户整理口述梦境。
 禁止医疗/心理诊断措辞（如「你患有」「你一定是」）。
 若内容涉及自伤/自杀/极端绝望，设置 riskFlag 为 true，并给出简短引导寻求专业帮助。
-输出必须是合法 JSON，字段：refinedNarrative, analysisText, tags（数组，每项含 name 与 category：person|place|object|emotion|theme|scene_type|other）, keywords, riskFlag, riskMessage。`;
+输出必须是合法 JSON，包含以下字段：
+- refinedNarrative: 整理后的梦境正文
+- analysisText: 温柔陪伴式解读
+- titlePhrase: 4–12 字中文意象短语（必填，禁止少于 4 字；不要直接截取正文开头；示例：「听不见的名字」「忽明忽暗的城市」「找不到的火车站」）
+- tags: 数组，每项含 name 与 category（person|place|object|emotion|theme|scene_type|other）
+- keywords, riskFlag, riskMessage
+
+示例 JSON 片段：
+{"titlePhrase":"忽明忽暗的城市","refinedNarrative":"…","analysisText":"…","tags":[{"name":"城市","category":"place"}],"keywords":[],"riskFlag":false,"riskMessage":null}`;
 
 export async function analyzeDream(rawTranscript: string): Promise<DreamAnalysisResult> {
   if (env.aiMock || !env.deepseekApiKey) {
@@ -77,11 +88,13 @@ export async function generateComicPanelPrompts(
       {
         role: 'system',
         content:
-          '为四格梦境漫画生成分镜。输出 JSON：{ "panels": [ { "panelIndex": 1-4, "caption": "中文短句", "seedreamPrompt": "英文或中文绘画 prompt，<=500字" } ] }',
+          '为四格梦境漫画生成分镜。每一格都是一张独立的「16:9 横版整幅电影感画面」：单一场景、单一镜头，横向铺满画面；' +
+          '不要画分镜格线/边框/留白/多格拼贴，不要任何文字、字母或对话气泡；主体置于画面中部并留出安全边距，避免被左右边缘裁切。' +
+          '输出 JSON：{ "panels": [ { "panelIndex": 1-4, "caption": "中文短句", "seedreamPrompt": "英文或中文绘画 prompt，<=500字，需在其中点明 16:9 横版全幅、单一场景、无边框无文字" } ] }',
       },
       {
         role: 'user',
-        content: `梦境文本：\n${refinedNarrative}\n\n视觉风格：${styleHint}\n生成 4 个连续分镜。`,
+        content: `梦境文本：\n${refinedNarrative}\n\n视觉风格：${styleHint}\n生成 4 个连续分镜，每格为独立的 16:9 横版全幅单场景画面（非拼贴、非多格、无文字）。`,
       },
     ],
     response_format: { type: 'json_object' },
@@ -102,7 +115,12 @@ export async function generateComicPanelPrompts(
 function parseAnalysisJson(text: string, fallbackRaw: string): DreamAnalysisResult {
   try {
     const p = JSON.parse(text) as DreamAnalysisResult;
-    if (p.refinedNarrative && p.analysisText) return p;
+    if (p.refinedNarrative && p.analysisText) {
+      return {
+        ...p,
+        titlePhrase: resolveTitlePhrase(fallbackRaw, p.tags, p.titlePhrase),
+      };
+    }
   } catch {
     /* fallback */
   }
@@ -111,14 +129,16 @@ function parseAnalysisJson(text: string, fallbackRaw: string): DreamAnalysisResu
 
 function mockAnalyze(raw: string): DreamAnalysisResult {
   const base = raw.trim().slice(0, 200) || '一段尚未说清的梦';
+  const tags = [
+    { name: '梦境', category: 'theme' },
+    { name: '自我观察', category: 'emotion' },
+  ];
   return {
     refinedNarrative: `${base}……（梦悸已帮你整理成更连贯的叙述。）`,
     analysisText:
       '这个梦像是你心里某个角落的投影。不必急着读懂它，先温柔地陪自己待一会儿就好。',
-    tags: [
-      { name: '梦境', category: 'theme' },
-      { name: '自我观察', category: 'emotion' },
-    ],
+    titlePhrase: deriveTitlePhrase(raw, tags),
+    tags,
     keywords: ['梦', '夜'],
     riskFlag: false,
   };
@@ -190,6 +210,6 @@ function mockComicPrompts(narrative: string, styleKey: string): ComicPanelPrompt
   return [1, 2, 3, 4].map((i) => ({
     panelIndex: i,
     caption: `第${i}格 · ${snippet}`,
-    seedreamPrompt: `${style}, dream comic panel ${i}, ${snippet}, cinematic, 2k`,
+    seedreamPrompt: `${style}, single full-frame cinematic scene, 16:9 horizontal composition, dream comic panel ${i}, ${snippet}, no panel borders, no grid, no text, subject centered with safe margins`,
   }));
 }

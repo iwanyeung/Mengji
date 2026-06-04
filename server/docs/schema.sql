@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS dreams (
   segments_combined_transcript TEXT,
   refined_narrative TEXT,
   analysis_text TEXT,
+  title TEXT,
   status VARCHAR(16) NOT NULL,
   narrative_hash VARCHAR(32),
   analysis_narrative_hash VARCHAR(32),
@@ -162,3 +163,6 @@ CREATE TABLE IF NOT EXISTS usage_daily (
   dream_analysis_count INT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, day)
 );
+
+-- 已有库迁移（亦见 server/src/db/schema.ts SCHEMA_MIGRATION_STATEMENTS）：
+-- ALTER TABLE dreams ADD COLUMN push_sent_at VARCHAR(32);

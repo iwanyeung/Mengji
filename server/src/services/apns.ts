@@ -3,8 +3,20 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { getDb, nowIso } from '../db';
 
+export type MengjiPushType = 'visual_done' | 'visual_failed' | 'dream_analyzed';
+
+export interface MengjiPushPayload {
+  type: MengjiPushType;
+  dreamId: string;
+  visualId?: string;
+  styleKey?: string;
+  failureCode?: string;
+}
+
+/** @deprecated 使用 MengjiPushPayload */
 export type VisualPushType = 'visual_done' | 'visual_failed';
 
+/** @deprecated 使用 MengjiPushPayload */
 export interface VisualPushPayload {
   type: VisualPushType;
   visualId: string;
@@ -34,7 +46,7 @@ async function sendApnsAlert(
   deviceToken: string,
   environment: 'sandbox' | 'production',
   alert: { title: string; body: string },
-  custom: VisualPushPayload,
+  custom: MengjiPushPayload,
 ): Promise<void> {
   const host = environment === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
   const authToken = createApnsJwt();
@@ -82,7 +94,13 @@ async function sendApnsAlert(
   });
 }
 
-function alertForPush(custom: VisualPushPayload): { title: string; body: string } {
+function alertForPush(custom: MengjiPushPayload): { title: string; body: string } {
+  if (custom.type === 'dream_analyzed') {
+    return {
+      title: '梦析已完成',
+      body: '你的梦境已整理完成，点按查看。',
+    };
+  }
   if (custom.type === 'visual_done') {
     return {
       title: '四格已落成',
@@ -108,10 +126,7 @@ function alertForPush(custom: VisualPushPayload): { title: string; body: string 
   }
 }
 
-export async function sendVisualCompletionPush(
-  userId: string,
-  custom: VisualPushPayload,
-): Promise<void> {
+export async function sendMengjiPush(userId: string, custom: MengjiPushPayload): Promise<void> {
   if (!hasApns()) {
     console.warn('[apns] skipped: APNS_* env not configured');
     return;
@@ -147,6 +162,23 @@ export async function sendVisualCompletionPush(
   }
 }
 
+export async function sendVisualCompletionPush(
+  userId: string,
+  custom: VisualPushPayload,
+): Promise<void> {
+  await sendMengjiPush(userId, {
+    type: custom.type,
+    dreamId: custom.dreamId,
+    visualId: custom.visualId,
+    styleKey: custom.styleKey,
+    failureCode: custom.failureCode,
+  });
+}
+
+export async function sendDreamAnalyzedPush(userId: string, dreamId: string): Promise<void> {
+  await sendMengjiPush(userId, { type: 'dream_analyzed', dreamId });
+}
+
 export async function markVisualPushSent(visualId: string): Promise<void> {
   await getDb().execute(`UPDATE dream_visuals SET push_sent_at = ? WHERE id = ?`, [nowIso(), visualId]);
 }
@@ -157,4 +189,16 @@ export async function shouldSendVisualPush(visualId: string): Promise<boolean> {
     [visualId],
   );
   return !row?.push_sent_at;
+}
+
+export async function shouldSendDreamAnalyzedPush(dreamId: string): Promise<boolean> {
+  const row = await getDb().queryOne<{ push_sent_at: string | null }>(
+    `SELECT push_sent_at FROM dreams WHERE id = ?`,
+    [dreamId],
+  );
+  return !row?.push_sent_at;
+}
+
+export async function markDreamAnalyzedPushSent(dreamId: string): Promise<void> {
+  await getDb().execute(`UPDATE dreams SET push_sent_at = ? WHERE id = ?`, [nowIso(), dreamId]);
 }

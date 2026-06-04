@@ -9,10 +9,10 @@ struct ComicResultView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var dreamStore: DreamStore
 
-    @State private var isFullscreenStripPresented = false
     @State private var fullscreenArtifact: ComicArtifact?
     @State private var fullscreenReady = false
     @State private var isPreparingFullscreen = false
+    @State private var isOpeningFullscreen = false
 
     var body: some View {
         ZStack {
@@ -101,8 +101,8 @@ struct ComicResultView: View {
         }
         .navigationTitle(displayedArtifact?.remoteImageURLs.isEmpty == false ? "四格已生成" : "四格预览")
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $isFullscreenStripPresented) {
-            ComicStripFullscreenView(artifact: fullscreenArtifact)
+        .fullScreenCover(item: $fullscreenArtifact) { artifact in
+            ComicStripFullscreenView(artifact: artifact)
         }
         .task(id: prefetchTaskKey) {
             await refreshLocalCacheIfNeeded()
@@ -170,44 +170,60 @@ struct ComicResultView: View {
             Button {
                 openFullscreenIfReady()
             } label: {
-                Group {
-                    if isPreparingFullscreen {
-                        Text("准备中…")
-                    } else if !fullscreenReady {
-                        Text("全屏")
-                    } else {
-                        Text("全屏")
-                    }
-                }
-                .font(AppTheme.capsFont(size: 10, weight: .semibold))
-                .foregroundColor(fullscreenReady ? AppTheme.text : AppTheme.muted)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(AppTheme.surface.opacity(0.92))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 0)
-                        .strokeBorder(AppTheme.muted.opacity(0.45), lineWidth: 1)
-                )
+                Text(fullscreenButtonTitle)
+                    .font(AppTheme.capsFont(size: 10, weight: .semibold))
+                    .foregroundColor(fullscreenReady ? AppTheme.text : AppTheme.muted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(AppTheme.surface.opacity(0.92))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 0)
+                            .strokeBorder(AppTheme.muted.opacity(0.45), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
-            .disabled(!fullscreenReady || isPreparingFullscreen)
-            .opacity(fullscreenReady || isPreparingFullscreen ? 1 : 0.55)
+            .disabled(!fullscreenReady || isPreparingFullscreen || isOpeningFullscreen)
+            .opacity(fullscreenReady || isPreparingFullscreen || isOpeningFullscreen ? 1 : 0.55)
             .padding(10)
         }
     }
 
-    private func openFullscreenIfReady() {
-        guard fullscreenReady else { return }
+    private var fullscreenButtonTitle: String {
+        if isOpeningFullscreen { return "打开中…" }
+        if isPreparingFullscreen { return "准备中…" }
+        return "全屏"
+    }
+
+    private func resolveFullscreenArtifact() -> ComicArtifact? {
+        guard let id = displayedArtifact?.id else { return displayedArtifact }
         if let dreamId,
-           let id = displayedArtifact?.id,
            let dream = dreamStore.dream(id: dreamId),
            let latest = dream.comicArtifacts.first(where: { $0.id == id }) {
-            fullscreenArtifact = latest
-        } else {
-            fullscreenArtifact = displayedArtifact
+            return latest
         }
-        guard fullscreenArtifact != nil else { return }
-        isFullscreenStripPresented = true
+        return displayedArtifact
+    }
+
+    private func openFullscreenIfReady() {
+        guard fullscreenReady, !isOpeningFullscreen else { return }
+        isOpeningFullscreen = true
+        Task { @MainActor in
+            defer { isOpeningFullscreen = false }
+            guard var resolved = resolveFullscreenArtifact(),
+                  !resolved.remoteImageURLs.isEmpty else {
+                fullscreenReady = false
+                return
+            }
+            if let dreamId {
+                resolved = await refreshAndMergeArtifact(resolved, dreamId: dreamId)
+            }
+            await ComicArtifactService.prepareForFullscreen(artifact: resolved)
+            guard resolved.isReadyForFullscreenDisplay() else {
+                fullscreenReady = false
+                return
+            }
+            fullscreenArtifact = resolved
+        }
     }
 
     private var actions: some View {
@@ -230,19 +246,26 @@ struct ComicResultView: View {
     }
 
     private var displayedArtifact: ComicArtifact? {
+        let base: ComicArtifact?
         if let artifact {
-            return artifact
+            base = artifact
+        } else if let dreamId, let dream = dreamStore.dream(id: dreamId) {
+            if let artifactId {
+                base = dream.comicArtifacts.first(where: { $0.id == artifactId }) ?? dream.comicArtifacts.last
+            } else {
+                base = dream.comicArtifacts.last
+            }
+        } else {
+            base = nil
         }
 
-        guard let dreamId, let dream = dreamStore.dream(id: dreamId) else {
-            return nil
+        guard let base else { return nil }
+        guard let dreamId,
+              let dream = dreamStore.dream(id: dreamId),
+              let latest = dream.comicArtifacts.first(where: { $0.id == base.id }) else {
+            return base
         }
-
-        if let artifactId {
-            return dream.comicArtifacts.first(where: { $0.id == artifactId }) ?? dream.comicArtifacts.last
-        }
-
-        return dream.comicArtifacts.last
+        return latest
     }
 
     private var displayMeta: (versionNumber: Int, createdAt: Date)? {

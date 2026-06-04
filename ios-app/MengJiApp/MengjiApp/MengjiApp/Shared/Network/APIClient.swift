@@ -13,6 +13,9 @@ enum APIConfig {
         } else {
             #if targetEnvironment(simulator)
             url = URL(string: "http://127.0.0.1:3000")!
+            #elseif DEBUG
+            // 内测 Staging（CVM）；上架后由 Info.plist / Release 构建覆盖为正式域名
+            url = URL(string: "http://49.233.91.206")!
             #else
             url = URL(string: "https://api.mengji.app")!
             #endif
@@ -35,8 +38,20 @@ enum APIError: LocalizedError {
         case .unauthorized: return "请先登录"
         case .paymentRequired: return "需要购买后继续"
         case .server(let msg): return msg
-        case .network(let err): return err.localizedDescription
+        case .network(let err): return Self.userFacingNetworkMessage(err)
         }
+    }
+
+    private static func userFacingNetworkMessage(_ error: Error) -> String {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain,
+           ns.code == NSURLErrorCannotFindHost || ns.code == NSURLErrorDNSLookupFailed {
+            return "无法连接梦悸服务器，请检查网络；内测包应使用已配置的后端地址"
+        }
+        if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorNotConnectedToInternet {
+            return "当前无网络连接，请稍后重试"
+        }
+        return error.localizedDescription
     }
 }
 

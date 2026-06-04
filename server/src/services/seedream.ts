@@ -2,6 +2,7 @@ import { env, hasSeedream } from '../config/env';
 import { isModerationError } from './visualFailure';
 import type { ComicPanelRef } from './comicImageUrls';
 
+/** doubao-seedream-4.0：0.20 元/张，按成功输出张数计费（与分辨率 1K/2K/4K 无关）。换模型时同步此值。 */
 const SEEDREAM_COST_PER_IMAGE = 0.2;
 export const MAX_RETRIES_PER_PANEL = 1;
 

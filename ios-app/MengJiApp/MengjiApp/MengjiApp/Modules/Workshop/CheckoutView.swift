@@ -44,7 +44,11 @@ struct CheckoutView: View {
             }
         }
         .navigationDestination(isPresented: $navigateToResult) {
-            ComicResultView(artifact: createdArtifact, appState: appState)
+            ComicResultView(
+                dreamId: dreamId,
+                artifact: createdArtifact,
+                appState: appState
+            )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomCTA
@@ -229,7 +233,7 @@ struct CheckoutView: View {
     private func openExistingVisual() async {
         guard let urls = existingVisualUrls, !urls.isEmpty else { return }
         let thumbStrings = existingVisualThumbUrls?.map(\.absoluteString)
-        let artifact = await ComicArtifactService.build(
+        let artifact = await ComicArtifactService.buildFast(
             styleId: styleId,
             previewDescription: "已有落成作品",
             fullURLStrings: urls.map(\.absoluteString),
@@ -246,7 +250,7 @@ struct CheckoutView: View {
 
     private func startCheckout(forceNew: Bool) async {
         guard jobStore.canStartNewJob() else {
-            jobStore.toastMessage = "已有一条四格正在生成，请稍后再试"
+            jobStore.showToast("已有一条四格正在生成，请稍后再试")
             return
         }
 

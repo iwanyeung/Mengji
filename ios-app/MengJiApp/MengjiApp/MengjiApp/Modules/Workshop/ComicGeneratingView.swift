@@ -3,6 +3,7 @@ import SwiftUI
 struct ComicGeneratingView: View {
     let dreamTitle: String
     let panelCount: Int
+    var panelThumbUrls: [String?] = []
     let statusMessage: String
     var onMinimize: () -> Void
 
@@ -77,35 +78,10 @@ struct ComicGeneratingView: View {
     }
 
     private var progressBar: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(AppTheme.surface)
-                    .frame(height: 6)
-
-                if showsIndeterminateProgress {
-                    indeterminateBar(width: geo.size.width)
-                } else {
-                    Rectangle()
-                        .fill(AppTheme.primaryColor)
-                        .frame(width: geo.size.width * progress, height: 6)
-                        .animation(.easeInOut(duration: 0.35), value: progress)
-                }
-            }
-        }
-        .frame(height: 6)
-    }
-
-    private func indeterminateBar(width: CGFloat) -> some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 4.0 : 1.0 / 20.0)) { context in
-            let cycle = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-            let segment = width * 0.28
-            let x = (width + segment) * cycle - segment
-            Rectangle()
-                .fill(AppTheme.primaryColor.opacity(0.85))
-                .frame(width: segment, height: 6)
-                .offset(x: x)
-        }
+        MengjiSegmentedProgressBar(
+            solidProgress: progress,
+            showsIndeterminate: showsIndeterminateProgress
+        )
     }
 
     private var panelIndicators: some View {
@@ -120,26 +96,36 @@ struct ComicGeneratingView: View {
     private func panelCell(for index: Int) -> some View {
         let isCompleted = index < panelCount
         let isCurrent = index == panelCount && panelCount < 4
+        let thumbURL: URL? = panelThumbUrls.indices.contains(index)
+            ? panelThumbUrls[index].flatMap { URL(string: $0) }
+            : nil
 
-        RoundedRectangle(cornerRadius: 0)
-            .strokeBorder(
-                isCompleted ? AppTheme.primaryColor : (isCurrent ? AppTheme.primaryColor : AppTheme.surface),
-                lineWidth: isCompleted || isCurrent ? 2 : 1
-            )
-            .frame(height: 48)
-            .background(
-                isCompleted
-                    ? AppTheme.primaryColor.opacity(0.12)
-                    : AppTheme.background.opacity(0.3)
-            )
-            .overlay {
-                if isCurrent {
-                    RoundedRectangle(cornerRadius: 0)
-                        .strokeBorder(AppTheme.primaryColor.opacity(pulsePhase ? 0.35 : 0.9), lineWidth: 1)
-                        .padding(3)
-                }
+        ZStack {
+            Rectangle()
+                .fill(isCompleted ? AppTheme.primaryColor.opacity(0.12) : AppTheme.background.opacity(0.3))
+
+            if let thumbURL {
+                ComicPanelImage(
+                    panel: ComicPanelDisplay(index: index, remoteURL: thumbURL, localRelativePath: nil)
+                )
             }
-            .scaleEffect(isCurrent && pulsePhase && !reduceMotion ? 1.02 : 1.0)
-            .animation(isCurrent ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default, value: pulsePhase)
+
+            if isCurrent {
+                Rectangle()
+                    .strokeBorder(AppTheme.primaryColor.opacity(pulsePhase ? 0.35 : 0.9), lineWidth: 1)
+                    .padding(3)
+            }
+        }
+        .frame(height: 48)
+        .clipped()
+        .overlay(
+            Rectangle()
+                .strokeBorder(
+                    isCompleted ? AppTheme.primaryColor : (isCurrent ? AppTheme.primaryColor : AppTheme.surface),
+                    lineWidth: isCompleted || isCurrent ? 2 : 1
+                )
+        )
+        .scaleEffect(isCurrent && pulsePhase && !reduceMotion ? 1.02 : 1.0)
+        .animation(isCurrent ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default, value: pulsePhase)
     }
 }

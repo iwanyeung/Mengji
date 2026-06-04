@@ -15,6 +15,20 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4C7A10022F7A010000CEB39A"
+               BuildableName = "MengjiWatch.app"
+               BlueprintName = "MengjiWatch"
+               ReferencedContainer = "container:MengjiApp.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "4C6DD1D72F67B95B00CEB39A"
                BuildableName = "MengjiApp.app"
                BlueprintName = "MengjiApp"
@@ -45,12 +59,21 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
+            BlueprintIdentifier = "4C7A10022F7A010000CEB39A"
+            BuildableName = "MengjiWatch.app"
+            BlueprintName = "MengjiWatch"
+            ReferencedContainer = "container:MengjiApp.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
             BlueprintIdentifier = "4C6DD1D72F67B95B00CEB39A"
             BuildableName = "MengjiApp.app"
             BlueprintName = "MengjiApp"
             ReferencedContainer = "container:MengjiApp.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "MENGJI_API_BASE"
@@ -72,9 +95,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4C6DD1D72F67B95B00CEB39A"
-            BuildableName = "MengjiApp.app"
-            BlueprintName = "MengjiApp"
+            BlueprintIdentifier = "4C7A10022F7A010000CEB39A"
+            BuildableName = "MengjiWatch.app"
+            BlueprintName = "MengjiWatch"
             ReferencedContainer = "container:MengjiApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

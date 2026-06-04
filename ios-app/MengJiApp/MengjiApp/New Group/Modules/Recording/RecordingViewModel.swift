@@ -12,6 +12,8 @@ final class RecordingViewModel: ObservableObject {
         let durationText: String
         var transcript: String
         var audioFileURL: URL?
+        var source: DreamRecordingDraftSource
+        var isSelected: Bool
     }
 
     /// 录梦完成并整理时回调，传入新梦的 ID（用于跳转梦析）
@@ -32,16 +34,10 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var organizingUploadedCount: Int = 0
     @Published private(set) var organizingSegmentTotal: Int = 0
     @Published private(set) var organizingShowsSuccess: Bool = false
-    /// 整理全屏期间压低录梦页极光动效
+    /// 整理全屏期间压低录梦页极光动效（全屏自有背景，默认不再压低）
     @Published private(set) var organizingAuroraCalm: Bool = false
 
-    private let pollComfortMessages = [
-        "仍在聆听你梦里的细节…",
-        "正在把片段连成一条故事…",
-        "温柔整理字里行间…",
-        "正在写下陪伴式解读…",
-    ]
-    private var pollComfortIndex = 0
+    private var organizingComfortTask: Task<Void, Never>?
 
     /// 语音识别管线曾失败（无权限/识别失败时极光保持静态，避免「像在监听」）
     @Published private(set) var recognitionPipelineFailed: Bool = false
@@ -76,6 +72,16 @@ final class RecordingViewModel: ObservableObject {
     private let pulseCooldown: TimeInterval = 0.85
 
     private let levelProcessQueue = DispatchQueue(label: "mengji.recording.level")
+    private var sessionCancellable: AnyCancellable?
+
+    var hasSelectedSegments: Bool {
+        segments.contains(where: \.isSelected)
+    }
+
+    var draftBannerText: String? {
+        guard !segments.isEmpty else { return nil }
+        return "共 \(segments.count) 段草稿，勾选参与整理后点「完成并整理」"
+    }
 
     var formattedCurrentDuration: String {
         let total = Int(currentDuration.rounded())
@@ -96,6 +102,45 @@ final class RecordingViewModel: ObservableObject {
 
     init() {
         refreshAuroraPolicy()
+        sessionCancellable = DreamRecordingSession.shared.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.reloadSegmentsFromSession()
+            }
+        reloadSegmentsFromSession()
+    }
+
+    func reloadSegmentsFromSession() {
+        Task { @MainActor in
+            let drafts = DreamRecordingSession.shared.drafts
+            segments = drafts.map { draft in
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = "MMM dd • HH:mm"
+                return Segment(
+                    id: draft.id,
+                    occurredAt: draft.occurredAt,
+                    meta: formatter.string(from: draft.occurredAt),
+                    durationText: draft.durationText,
+                    transcript: draft.transcript,
+                    audioFileURL: draft.audioFileURL,
+                    source: draft.source,
+                    isSelected: draft.isSelected
+                )
+            }
+        }
+    }
+
+    func beginNewDreamSession() {
+        Task { @MainActor in
+            DreamRecordingSession.shared.beginNewDream()
+        }
+    }
+
+    func setSegmentSelected(id: UUID, selected: Bool) {
+        Task { @MainActor in
+            DreamRecordingSession.shared.setSelected(id: id, selected: selected)
+        }
     }
 
     func refreshAuroraPolicy() {
@@ -334,15 +379,18 @@ final class RecordingViewModel: ObservableObject {
         let meta = formatter.string(from: now)
         let durationText = String(format: "%02d:%02d", duration / 60, duration % 60)
         let transcriptText = liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        let segment = Segment(
-            id: UUID(),
-            occurredAt: now,
-            meta: meta,
-            durationText: durationText,
-            transcript: transcriptText.isEmpty ? "（未识别到语音）" : transcriptText,
-            audioFileURL: segmentAudioURL
-        )
-        segments.insert(segment, at: 0)
+        let segmentId = UUID()
+        let transcript = transcriptText.isEmpty ? "（未识别到语音）" : transcriptText
+        Task { @MainActor in
+            DreamRecordingSession.shared.appendPhoneSegment(
+                id: segmentId,
+                occurredAt: now,
+                meta: meta,
+                durationText: durationText,
+                transcript: transcript,
+                audioFileURL: segmentAudioURL
+            )
+        }
         segmentAudioURL = nil
 
         Analytics.track("recording_segment_finished", properties: [
@@ -361,6 +409,7 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func dismissOrganizing() {
+        stopOrganizingComfortRotation()
         isProcessingDream = false
         processingError = nil
         organizingShowsSuccess = false
@@ -369,52 +418,76 @@ final class RecordingViewModel: ObservableObject {
     }
 
     private func resetOrganizingPresentation() {
+        stopOrganizingComfortRotation()
         organizingPhase = .preparing
         organizingStatusMessage = DreamOrganizingPhase.preparing.defaultStatusMessage
         organizingUploadedCount = 0
         organizingSegmentTotal = 0
-        pollComfortIndex = 0
     }
 
     private func setOrganizingPhase(_ phase: DreamOrganizingPhase, message: String? = nil) {
         organizingPhase = phase
-        organizingStatusMessage = message ?? phase.defaultStatusMessage
+        if let message {
+            stopOrganizingComfortRotation()
+            organizingStatusMessage = message
+        } else if phase == .complete {
+            stopOrganizingComfortRotation()
+            organizingStatusMessage = phase.defaultStatusMessage
+        } else {
+            startOrganizingComfortRotation(for: phase)
+        }
     }
 
-    private func rotatePollComfortMessage() {
-        pollComfortIndex = (pollComfortIndex + 1) % pollComfortMessages.count
-        organizingStatusMessage = pollComfortMessages[pollComfortIndex]
+    private func startOrganizingComfortRotation(for phase: DreamOrganizingPhase) {
+        stopOrganizingComfortRotation()
+        let messages = phase.comfortMessages
+        guard !messages.isEmpty else { return }
+        organizingStatusMessage = messages[0]
+        guard messages.count > 1 else { return }
+
+        var index = 0
+        organizingComfortTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 3_500_000_000)
+                guard !Task.isCancelled else { break }
+                index = (index + 1) % messages.count
+                organizingStatusMessage = messages[index]
+            }
+        }
+    }
+
+    private func stopOrganizingComfortRotation() {
+        organizingComfortTask?.cancel()
+        organizingComfortTask = nil
     }
 
     func finishAllSegments() {
-        guard !segments.isEmpty else { return }
+        guard hasSelectedSegments else { return }
         if isProcessingDream, processingError == nil, !organizingShowsSuccess { return }
 
         let now = Date()
-        let sorted = segments.sorted { $0.occurredAt < $1.occurredAt }
-        let dreamId = UUID()
-        let segmentCount = segments.count
+        let sorted = segments
+            .filter(\.isSelected)
+            .sorted { $0.occurredAt < $1.occurredAt }
+        let segmentCount = sorted.count
 
         isProcessingDream = true
         processingError = nil
         organizingShowsSuccess = false
-        organizingAuroraCalm = true
         organizingSegmentTotal = segmentCount
         organizingUploadedCount = 0
-        pollComfortIndex = 0
         setOrganizingPhase(.preparing)
 
         Task { @MainActor in
-            defer {
-                organizingAuroraCalm = false
-            }
+            let dreamId = DreamRecordingSession.shared.dreamId ?? DreamRecordingSession.shared.startIfNeeded()
             do {
                 try await AuthService.shared.ensureAnonymousSession()
                 try await DreamService.shared.createDream(id: dreamId, occurredAt: now)
 
                 setOrganizingPhase(.uploading)
                 let uploadSegments = sorted.enumerated().map { idx, seg in
-                    (index: idx, transcript: seg.transcript, audioURL: seg.audioFileURL)
+                    let transcript = seg.source == .watch && seg.transcript.isEmpty ? "" : seg.transcript
+                    return (index: idx, transcript: transcript, audioURL: seg.audioFileURL)
                 }
                 try await DreamService.shared.uploadSegments(
                     dreamId: dreamId,
@@ -430,26 +503,14 @@ final class RecordingViewModel: ObservableObject {
                 try await DreamService.shared.finalizeRecording(dreamId: dreamId)
 
                 setOrganizingPhase(.analyzing)
-                let detail = try await DreamService.shared.pollUntilAnalyzed(dreamId: dreamId) { [weak self] _, _ in
-                    Task { @MainActor in
-                        self?.rotatePollComfortMessage()
-                    }
-                }
+                let detail = try await DreamService.shared.pollUntilAnalyzed(dreamId: dreamId)
 
-                var dream = Dream(
-                    id: dreamId,
-                    createdAt: now,
-                    rawTranscript: detail.rawTranscript ?? "",
-                    organizedText: detail.refinedNarrative ?? "",
-                    interpretation: detail.analysisText ?? "",
-                    tags: detail.tags?.map(\.name) ?? [],
-                    title: String((detail.refinedNarrative ?? "未命名梦境").prefix(24)),
-                    note: nil,
-                    isArchived: false,
-                    comicArtifacts: []
-                )
+                guard var dream = DreamService.shared.dream(from: detail) else {
+                    throw APIError.server("无法解析梦析结果")
+                }
                 DreamService.shared.applyServerDetail(detail, to: &dream)
                 DreamStore.shared.upsert(dream)
+                DreamRecordingSession.shared.clear()
                 segments.removeAll()
 
                 Analytics.track("dream_recording_finished", properties: [
@@ -458,11 +519,14 @@ final class RecordingViewModel: ObservableObject {
                     "source": "server_ai"
                 ])
 
+                WatchNotificationBridge.shared.notifyDreamAnalyzed(dreamId: dream.id)
+
                 organizingShowsSuccess = true
                 setOrganizingPhase(.complete)
-                try await Task.sleep(nanoseconds: 550_000_000)
+                try await Task.sleep(nanoseconds: DreamOrganizingTiming.successDisplayNanoseconds)
                 isProcessingDream = false
                 resetOrganizingPresentation()
+                try await Task.sleep(nanoseconds: DreamOrganizingTiming.postDismissNavigateNanoseconds)
                 onFinishRecording?(dream.id)
             } catch {
                 processingError = error.localizedDescription
@@ -482,12 +546,15 @@ final class RecordingViewModel: ObservableObject {
                     comicArtifacts: []
                 )
                 DreamStore.shared.upsert(dream)
+                DreamRecordingSession.shared.clear()
                 segments.removeAll()
+                WatchNotificationBridge.shared.notifyDreamAnalyzed(dreamId: dream.id)
                 organizingShowsSuccess = true
                 setOrganizingPhase(.complete)
-                try? await Task.sleep(nanoseconds: 550_000_000)
+                try? await Task.sleep(nanoseconds: DreamOrganizingTiming.successDisplayNanoseconds)
                 isProcessingDream = false
                 resetOrganizingPresentation()
+                try? await Task.sleep(nanoseconds: DreamOrganizingTiming.postDismissNavigateNanoseconds)
                 onFinishRecording?(dream.id)
                 #endif
             }
@@ -495,6 +562,8 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func deleteSegment(id: UUID) {
-        segments.removeAll { $0.id == id }
+        Task { @MainActor in
+            DreamRecordingSession.shared.removeDraft(id: id)
+        }
     }
 }
