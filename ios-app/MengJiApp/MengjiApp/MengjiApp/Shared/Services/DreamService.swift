@@ -266,7 +266,8 @@ struct DreamService {
     func fetchComicStoryboard(dreamId: UUID, styleKey: String) async throws -> ComicStoryboardPreview {
         try await APIClient.shared.request(
             "GET",
-            path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-storyboard?styleKey=\(styleKey)"
+            path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-storyboard",
+            query: [URLQueryItem(name: "styleKey", value: styleKey)]
         )
     }
 
