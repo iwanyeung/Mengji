@@ -20,6 +20,7 @@ struct CheckoutView: View {
     @State private var existingVisualThumbUrls: [URL]?
     @State private var existingVisualAvailable = false
     @State private var narrativeStaleForComic = false
+    @State private var comicReadiness: ComicReadiness?
 
     var body: some View {
         ZStack {
@@ -28,6 +29,9 @@ struct CheckoutView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     header
+                    if let comicReadiness, !existingVisualAvailable {
+                        ComicReadinessBanner(readiness: comicReadiness)
+                    }
                     orderSummary
                     if existingVisualAvailable {
                         existingVisualBanner
@@ -60,6 +64,17 @@ struct CheckoutView: View {
             await store.loadProduct()
             await refreshEntitlements()
             await checkExistingVisual()
+            await loadComicReadiness()
+        }
+    }
+
+    private func loadComicReadiness() async {
+        guard let id = dreamId else { return }
+        do {
+            try await AuthService.shared.ensureAnonymousSession()
+            comicReadiness = try await DreamService.shared.fetchComicReadiness(dreamId: id)
+        } catch {
+            comicReadiness = nil
         }
     }
 
@@ -173,7 +188,7 @@ struct CheckoutView: View {
                     ctaLabel(
                         jobStore.isBusy
                             ? "生成中…"
-                            : (narrativeStaleForComic ? "按新内容重新落成四格" : "开始落成四格漫画")
+                            : (narrativeStaleForComic ? "按新内容重新落成四格" : (comicReadiness?.ctaHint ?? "开始落成四格漫画"))
                     )
                 }
                 .disabled(jobStore.isBusy)

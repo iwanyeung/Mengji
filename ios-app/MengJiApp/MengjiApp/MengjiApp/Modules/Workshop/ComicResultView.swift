@@ -4,8 +4,10 @@ struct ComicResultView: View {
     var dreamId: UUID? = nil
     var artifactId: UUID? = nil
     var artifact: ComicArtifact?
+    var visualId: String? = nil
 
     @ObservedObject var appState: AppState
+    @ObservedObject private var jobStore = ComicGenerationJobStore.shared
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var dreamStore: DreamStore
 
@@ -13,6 +15,13 @@ struct ComicResultView: View {
     @State private var fullscreenReady = false
     @State private var isPreparingFullscreen = false
     @State private var isOpeningFullscreen = false
+    @State private var storyboardCaptions: [VisualDetail.VisualStoryboardCaption] = []
+    @State private var selectedFidelityFeedback: ComicFidelityFeedback?
+    @State private var compensationEligible = false
+    @State private var compensationHint: String?
+    @State private var isSubmittingFeedback = false
+    @State private var feedbackMessage: String?
+    @State private var isStartingCompensationRetry = false
 
     var body: some View {
         ZStack {
@@ -92,6 +101,8 @@ struct ComicResultView: View {
                     }
                     .tint(AppTheme.primaryColor)
 
+                    storyboardCaptionsSection
+                    fidelityFeedbackSection
                     actions
                 }
                 .padding(.horizontal, 24)
@@ -107,6 +118,210 @@ struct ComicResultView: View {
         .task(id: prefetchTaskKey) {
             await refreshLocalCacheIfNeeded()
             await warmFullscreenAssets()
+            await loadVisualMetadata()
+        }
+    }
+
+    private var resolvedVisualId: String? {
+        if let visualId, !visualId.isEmpty { return visualId }
+        return displayedArtifact?.id.uuidString.lowercased()
+    }
+
+    @ViewBuilder
+    private var storyboardCaptionsSection: some View {
+        if !storyboardCaptions.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("四格故事线")
+                    .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.text)
+
+                ForEach(storyboardCaptions, id: \.panelIndex) { panel in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("\(panel.panelIndex)")
+                            .font(AppTheme.capsFont(size: 10, weight: .semibold))
+                            .foregroundColor(AppTheme.muted)
+                            .frame(width: 18)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(panel.caption)
+                                .font(AppTheme.bodyFont(size: 12))
+                                .foregroundColor(AppTheme.text.opacity(0.92))
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text(sourceLabel(panel.source))
+                                .font(AppTheme.capsFont(size: 9, weight: .semibold))
+                                .foregroundColor(AppTheme.muted)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 0)
+                    .strokeBorder(AppTheme.surface, lineWidth: 1)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var fidelityFeedbackSection: some View {
+        if displayedArtifact?.remoteImageURLs.isEmpty == false,
+           resolvedVisualId != nil {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("和梦对得上吗？")
+                .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.text)
+
+            Text("你的反馈会帮助我们改进落成体验，不会影响梦境记录。")
+                .font(AppTheme.bodyFont(size: 12))
+                .foregroundColor(AppTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if selectedFidelityFeedback == nil {
+                VStack(spacing: 8) {
+                    ForEach(ComicFidelityFeedback.allCases, id: \.self) { option in
+                        Button {
+                            Task { await submitFidelityFeedback(option) }
+                        } label: {
+                            Text(option.label)
+                                .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                                .foregroundColor(AppTheme.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 12)
+                                .background(AppTheme.surface.opacity(0.85))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 0)
+                                        .strokeBorder(AppTheme.muted.opacity(0.35), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSubmittingFeedback)
+                    }
+                }
+            } else if let selectedFidelityFeedback {
+                Text("已记录：\(selectedFidelityFeedback.label)")
+                    .font(AppTheme.bodyFont(size: 12))
+                    .foregroundColor(AppTheme.muted)
+            }
+
+            if let feedbackMessage {
+                Text(feedbackMessage)
+                    .font(AppTheme.bodyFont(size: 12))
+                    .foregroundColor(AppTheme.primaryColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if compensationEligible, let hint = compensationHint {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(hint)
+                        .font(AppTheme.bodyFont(size: 12))
+                        .foregroundColor(AppTheme.text.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button {
+                        Task { await startCompensationRetry() }
+                    } label: {
+                        Text(isStartingCompensationRetry ? "正在启动意象重试…" : "免费意象四格重试")
+                            .font(AppTheme.bodyFont(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.background)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(AppTheme.primaryColor)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isStartingCompensationRetry || jobStore.isBusy)
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 0)
+                .strokeBorder(AppTheme.surface, lineWidth: 1)
+        )
+        }
+    }
+
+    private func sourceLabel(_ raw: String) -> String {
+        ComicPanelSource(rawValue: raw)?.label ?? "意象延伸"
+    }
+
+    private func loadVisualMetadata() async {
+        guard let visualId = resolvedVisualId else { return }
+        do {
+            try await AuthService.shared.ensureAnonymousSession()
+            let detail = try await VisualService.shared.fetchAuthorized(visualId: visualId)
+            storyboardCaptions = detail.storyboardCaptions ?? []
+            if let raw = detail.fidelityFeedback,
+               let feedback = ComicFidelityFeedback(rawValue: raw) {
+                selectedFidelityFeedback = feedback
+            }
+            if detail.compensationRedeemed == true {
+                compensationEligible = false
+            }
+        } catch {
+            storyboardCaptions = []
+        }
+    }
+
+    private func submitFidelityFeedback(_ feedback: ComicFidelityFeedback) async {
+        guard let visualId = resolvedVisualId else { return }
+        isSubmittingFeedback = true
+        feedbackMessage = nil
+        defer { isSubmittingFeedback = false }
+
+        do {
+            try await AuthService.shared.ensureAnonymousSession()
+            let response = try await VisualService.shared.submitFidelityFeedback(
+                visualId: visualId,
+                feedback: feedback
+            )
+            selectedFidelityFeedback = feedback
+            compensationEligible = response.compensationEligible
+            compensationHint = response.compensationHint
+            feedbackMessage = response.compensationEligible
+                ? "感谢反馈，你可以免费再试一次意象四格。"
+                : "感谢你的反馈。"
+        } catch {
+            feedbackMessage = error.localizedDescription
+        }
+    }
+
+    private func startCompensationRetry() async {
+        guard let dreamId,
+              let visualId = resolvedVisualId,
+              let artifact = displayedArtifact,
+              jobStore.canStartNewJob() else { return }
+
+        isStartingCompensationRetry = true
+        defer { isStartingCompensationRetry = false }
+
+        do {
+            try await AuthService.shared.ensureAnonymousSession()
+            jobStore.beginSubmission()
+            jobStore.updateSubmissionStatus("正在以意象模式重试…")
+            let job = try await VisualService.shared.createFourPanel(
+                dreamId: dreamId,
+                styleKey: artifact.styleId,
+                transactionJws: nil,
+                forceNew: true,
+                compensationForVisualId: visualId,
+                forceImageryMode: true
+            )
+            let dreamTitle = dreamStore.dream(id: dreamId)?.title ?? "你的梦"
+            jobStore.startJob(
+                visualId: job.visualId,
+                dreamId: dreamId,
+                styleId: artifact.styleId,
+                dreamTitle: dreamTitle
+            )
+            compensationEligible = false
+            feedbackMessage = "已开始免费意象重试，可在梦作间查看进度。"
+            dismiss()
+            appState.openWorkshop(from: dreamId)
+        } catch {
+            jobStore.cancelSubmission()
+            feedbackMessage = error.localizedDescription
         }
     }
 

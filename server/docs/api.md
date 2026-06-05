@@ -134,6 +134,29 @@
 
 ## 显化工坊（四格漫画）
 
+### GET /api/dreams/{dreamId}/comic-readiness
+
+返回该梦境的四格落成就绪度（段数、字数、具象意象数、建议模式与用户提示文案）。
+
+### GET /api/dreams/{dreamId}/comic-storyboard?styleKey=noir-comic
+
+同步生成/读取分镜预览（付费前确认）。响应含 `panels[].caption`、`panels[].source`（`verbatim` | `atmosphere` | `inferred`）、`storyboardMode`、`readiness`。
+
+### PUT /api/dreams/{dreamId}/comic-storyboard
+
+用户确认前修改分镜文案。
+
+```json
+{
+  "styleKey": "noir-comic",
+  "panels": [{ "panelIndex": 1, "caption": "..." }]
+}
+```
+
+### POST /api/dreams/{dreamId}/comic-storyboard/prefetch
+
+后台预生成分镜（风格选择页调用，加速预览）。
+
 ### POST /api/dreams/{dreamId}/visuals/four-panel
 
 创建一个四格漫画显化任务（通常在支付成功后调用）。
@@ -142,10 +165,16 @@
 
 ```json
 {
-  "styleKey": "high_contrast_bw",
-  "paymentReference": "apple-iap-receipt-or-wechat-order-id"
+  "dreamId": "dream-id",
+  "styleKey": "noir-comic",
+  "transactionJws": "apple-jws-or-null",
+  "forceNew": false,
+  "compensationForVisualId": null,
+  "forceImageryMode": false
 }
 ```
+
+`compensationForVisualId`：忠实度补偿重试时传入原 `visualId`，免付费/免额度。
 
 - 响应体：
 
@@ -185,6 +214,18 @@
 ```
 
 `failureCode` 取值：`moderation_blocked` | `service_unavailable` | `partial_success` | `generation_failed` | `unknown_error`
+
+成功时额外字段：`readinessLevelAtGen`、`storyboardMode`、`storyboardCaptions`（分镜对照）。
+
+### POST /api/visuals/{visualId}/fidelity-feedback
+
+落成结果忠实度反馈。
+
+```json
+{ "feedback": "too_invented", "optionalNote": "可选" }
+```
+
+`feedback`：`very_close` | `too_invented` | `not_mine`。响应含 `compensationEligible` 与 `compensationHint`。
 
 ## 潜意识星图
 

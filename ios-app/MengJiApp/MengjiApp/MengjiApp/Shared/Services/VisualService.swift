@@ -45,6 +45,18 @@ struct VisualDetail: Decodable {
     let userMessage: String?
     let quotaRefunded: Bool?
     let successfulPanelCount: Int?
+    let readinessLevelAtGen: String?
+    let storyboardMode: String?
+    let fidelityFeedback: String?
+    let compensationRedeemed: Bool?
+    let compensationForVisualId: String?
+    let storyboardCaptions: [VisualStoryboardCaption]?
+
+    struct VisualStoryboardCaption: Decodable {
+        let panelIndex: Int
+        let caption: String
+        let source: String
+    }
 }
 
 struct VisualService {
@@ -54,13 +66,17 @@ struct VisualService {
         dreamId: UUID,
         styleKey: String,
         transactionJws: String?,
-        forceNew: Bool = false
+        forceNew: Bool = false,
+        compensationForVisualId: String? = nil,
+        forceImageryMode: Bool = false
     ) async throws -> VisualJob {
         struct Body: Encodable {
             let dreamId: String
             let styleKey: String
             let transactionJws: String?
             let forceNew: Bool
+            let compensationForVisualId: String?
+            let forceImageryMode: Bool
         }
         return try await APIClient.shared.request(
             "POST",
@@ -69,8 +85,26 @@ struct VisualService {
                 dreamId: dreamId.uuidString.lowercased(),
                 styleKey: styleKey,
                 transactionJws: transactionJws,
-                forceNew: forceNew
+                forceNew: forceNew,
+                compensationForVisualId: compensationForVisualId,
+                forceImageryMode: forceImageryMode
             )
+        )
+    }
+
+    func submitFidelityFeedback(
+        visualId: String,
+        feedback: ComicFidelityFeedback,
+        optionalNote: String? = nil
+    ) async throws -> ComicFidelityFeedbackResponse {
+        struct Body: Encodable {
+            let feedback: String
+            let optionalNote: String?
+        }
+        return try await APIClient.shared.request(
+            "POST",
+            path: "api/visuals/\(visualId)/fidelity-feedback",
+            body: Body(feedback: feedback.rawValue, optionalNote: optionalNote)
         )
     }
 

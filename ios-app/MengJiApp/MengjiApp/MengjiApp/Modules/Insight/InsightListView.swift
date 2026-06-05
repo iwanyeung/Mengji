@@ -68,9 +68,26 @@ struct InsightListView: View {
                                 .kerning(-0.2)
                                 .foregroundColor(AppTheme.text)
                                 .multilineTextAlignment(.leading)
-                            Text(dateString(for: dream.createdAt))
-                                .font(AppTheme.bodyFont(size: 12))
-                                .foregroundColor(AppTheme.muted)
+                            HStack(spacing: 8) {
+                                Text(dateString(for: dream.createdAt))
+                                    .font(AppTheme.bodyFont(size: 12))
+                                    .foregroundColor(AppTheme.muted)
+
+                                if dream.hasComic {
+                                    Text("已落成")
+                                        .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                                        .foregroundColor(AppTheme.background)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(AppTheme.primaryColor)
+
+                                    if dream.comicArtifacts.count > 1 {
+                                        Text("共 \(dream.comicArtifacts.count) 版")
+                                            .font(AppTheme.bodyFont(size: 11))
+                                            .foregroundColor(AppTheme.muted)
+                                    }
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         Image(systemName: "chevron.right")

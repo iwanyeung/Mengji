@@ -5,7 +5,7 @@ struct StyleSelectionView: View {
 
     @ObservedObject var appState: AppState
     @State private var selectedStyleId: String?
-    @State private var navigateToPayment = false
+    @State private var navigateToStoryboard = false
 
     private let styles: [WorkshopStyle] = [
         WorkshopStyle(
@@ -47,8 +47,8 @@ struct StyleSelectionView: View {
                 .padding(.bottom, 18)
             }
         }
-        .navigationDestination(isPresented: $navigateToPayment) {
-            CheckoutView(
+        .navigationDestination(isPresented: $navigateToStoryboard) {
+            StoryboardPreviewView(
                 dreamId: dreamId,
                 styleId: selectedStyleId ?? styles.first?.id ?? "",
                 appState: appState
@@ -95,12 +95,12 @@ struct StyleSelectionView: View {
             }
             if selectedStyleId != nil {
                 withAnimation(WorkshopMotion.navigationSpring) {
-                    navigateToPayment = true
+                    navigateToStoryboard = true
                 }
             }
         } label: {
             HStack(spacing: 10) {
-                Text("继续 · 让这条梦落成四格")
+                Text("继续 · 预览分镜")
                 Spacer()
                 Image(systemName: "arrow.right")
             }

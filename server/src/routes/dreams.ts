@@ -15,7 +15,13 @@ import {
   replaceDreamTagsFromUser,
   type DreamFeedbackType,
 } from '../services/dreamInsight';
-import { prefetchStoryboardsForDream, ensureStoryboard } from '../services/comicStoryboardCache';
+import {
+  prefetchStoryboardsForDream,
+  ensureStoryboard,
+  loadDreamStoryboardContext,
+  updateStoryboardCaptions,
+  getCachedStoryboardBundle,
+} from '../services/comicStoryboardCache';
 import {
   markDreamAnalyzedPushSent,
   sendDreamAnalyzedPush,
@@ -61,6 +67,8 @@ async function dreamToResponse(dreamId: string) {
   );
 
   const fb = await getDreamFeedback(dreamId);
+  const storyboardCtx = await loadDreamStoryboardContext(dreamId);
+  const comicReadiness = storyboardCtx?.readiness ?? null;
 
   return {
     id: dream.id,
@@ -86,6 +94,7 @@ async function dreamToResponse(dreamId: string) {
           interpretationRevision: fb.interpretation_revision,
         }
       : null,
+    comicReadiness,
   };
 }
 
@@ -222,6 +231,101 @@ export function createDreamsRouter(): Router {
     } catch (e) {
       res.status(400).json({ error: e instanceof Error ? e.message : '保存反馈失败' });
     }
+  });
+
+  router.get('/:dreamId/comic-readiness', requireAuth, async (req, res) => {
+    const dreamId = req.params.dreamId;
+    const db = getDb();
+    const dream = await db.queryOne(`SELECT id FROM dreams WHERE id = ? AND user_id = ?`, [
+      dreamId,
+      req.auth!.userId,
+    ]);
+    if (!dream) {
+      res.status(404).json({ error: '梦境不存在' });
+      return;
+    }
+    const ctx = await loadDreamStoryboardContext(dreamId);
+    if (!ctx) {
+      res.status(404).json({ error: '梦境不存在' });
+      return;
+    }
+    res.json(ctx.readiness);
+  });
+
+  router.get('/:dreamId/comic-storyboard', requireAuth, async (req, res) => {
+    const dreamId = req.params.dreamId;
+    const styleKey = String(req.query.styleKey || 'noir-comic');
+    const db = getDb();
+    const dream = await db.queryOne<{ refined_narrative: string | null }>(
+      `SELECT refined_narrative FROM dreams WHERE id = ? AND user_id = ?`,
+      [dreamId, req.auth!.userId],
+    );
+    if (!dream) {
+      res.status(404).json({ error: '梦境不存在' });
+      return;
+    }
+    const narrative = dream.refined_narrative?.trim() || '';
+    if (!narrative) {
+      res.status(400).json({ error: '请先完成梦境整理' });
+      return;
+    }
+
+    const ctx = await loadDreamStoryboardContext(dreamId);
+    const panels = await ensureStoryboard(dreamId, styleKey, narrative);
+    const bundle = (await getCachedStoryboardBundle(dreamId, styleKey, narrative)) ?? {
+      panels,
+      storyboardMode: ctx?.readiness.suggestedMode ?? 'imagery',
+    };
+
+    res.json({
+      styleKey,
+      storyboardMode: bundle.storyboardMode ?? ctx?.readiness.suggestedMode ?? 'imagery',
+      readiness: ctx?.readiness ?? null,
+      panels: bundle.panels.map((p) => ({
+        panelIndex: p.panelIndex,
+        caption: p.caption,
+        source: p.source ?? 'atmosphere',
+      })),
+      inferredPanelCount: bundle.panels.filter((p) => p.source === 'inferred').length,
+    });
+  });
+
+  router.put('/:dreamId/comic-storyboard', requireAuth, async (req, res) => {
+    const dreamId = req.params.dreamId;
+    const styleKey = String(req.body?.styleKey || 'noir-comic');
+    const captions = Array.isArray(req.body?.panels) ? req.body.panels : [];
+    const db = getDb();
+    const dream = await db.queryOne<{ refined_narrative: string | null }>(
+      `SELECT refined_narrative FROM dreams WHERE id = ? AND user_id = ?`,
+      [dreamId, req.auth!.userId],
+    );
+    if (!dream) {
+      res.status(404).json({ error: '梦境不存在' });
+      return;
+    }
+    const narrative = dream.refined_narrative?.trim() || '';
+    if (!narrative) {
+      res.status(400).json({ error: '请先完成梦境整理' });
+      return;
+    }
+
+    const normalizedCaptions = captions
+      .map((c: { panelIndex?: number; caption?: string }) => ({
+        panelIndex: Number(c.panelIndex),
+        caption: String(c.caption || '').trim(),
+      }))
+      .filter((c: { panelIndex: number; caption: string }) => c.panelIndex >= 1 && c.panelIndex <= 4 && c.caption);
+
+    await ensureStoryboard(dreamId, styleKey, narrative);
+    const panels = await updateStoryboardCaptions(dreamId, styleKey, narrative, normalizedCaptions);
+    res.json({
+      ok: true,
+      panels: panels.map((p) => ({
+        panelIndex: p.panelIndex,
+        caption: p.caption,
+        source: p.source ?? 'atmosphere',
+      })),
+    });
   });
 
   router.post('/:dreamId/comic-storyboard/prefetch', requireAuth, async (req, res) => {

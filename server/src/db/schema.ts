@@ -185,6 +185,11 @@ export const SCHEMA_MIGRATION_STATEMENTS = [
   `ALTER TABLE dream_visuals ADD COLUMN push_sent_at VARCHAR(32)`,
   `ALTER TABLE dreams ADD COLUMN title TEXT`,
   `ALTER TABLE dreams ADD COLUMN push_sent_at VARCHAR(32)`,
+  `ALTER TABLE dream_visuals ADD COLUMN readiness_level_at_gen VARCHAR(16)`,
+  `ALTER TABLE dream_visuals ADD COLUMN storyboard_mode VARCHAR(16)`,
+  `ALTER TABLE dream_visuals ADD COLUMN fidelity_feedback VARCHAR(32)`,
+  `ALTER TABLE dream_visuals ADD COLUMN compensation_redeemed INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE dream_visuals ADD COLUMN compensation_for_visual_id VARCHAR(64)`,
 ];
 
 export const MYSQL_INDEX_STATEMENTS = [

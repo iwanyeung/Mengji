@@ -25,10 +25,20 @@ export interface DreamAnalysisResult {
   riskMessage?: string;
 }
 
+export type ComicPanelSource = 'verbatim' | 'atmosphere' | 'inferred';
+
 export interface ComicPanelPrompt {
   panelIndex: number;
   caption: string;
   seedreamPrompt: string;
+  source?: ComicPanelSource;
+}
+
+export interface ComicStoryboardInput {
+  refinedNarrative: string;
+  rawTranscript: string;
+  tags: Array<{ name: string; category: string }>;
+  mode: 'imagery' | 'narrative';
 }
 
 const SYSTEM_PROMPT = `你是梦悸 App 的梦境整理助手。用温柔陪伴的口吻，帮助用户整理口述梦境。
@@ -69,12 +79,28 @@ export async function analyzeDream(rawTranscript: string): Promise<DreamAnalysis
   return parseAnalysisJson(text, rawTranscript);
 }
 
+const COMIC_STORYBOARD_SYSTEM = `你是梦悸 App 的四格梦境分镜助手。必须忠实用户已记录的梦境，禁止编造用户未提及的角色、地点、情节转折。
+
+忠实度规则：
+1. 只能使用「梦境原文」「整理正文」「标签/关键词」中已出现的人、地、物、动作与情绪。
+2. 禁止新增剧情转折、新角色、新地点；不得把梦写成完整小说。
+3. 每格标注 source：
+   - verbatim：直接来自用户梦境的明确场景
+   - atmosphere：同一意象的光影/远近/氛围延伸（不新增实体）
+   - inferred：仅当信息略不足时用于过渡，全梦最多 1 格（叙事模式最多 2 格）
+4. 若素材不足：优先用「意象四格」——同一核心意象的不同镜头（特写/全景/倒影/消散），不要编新故事。
+5. caption 用中文短句，seedreamPrompt 为绘画 prompt（<=500字），需点明 16:9 横版全幅、单一场景、无边框无文字、无对话气泡。
+6. 每一格都是独立 16:9 横版整幅电影感画面，不要分镜格线/多格拼贴。
+
+输出 JSON：
+{ "panels": [ { "panelIndex": 1-4, "caption": "...", "seedreamPrompt": "...", "source": "verbatim|atmosphere|inferred" } ] }`;
+
 export async function generateComicPanelPrompts(
-  refinedNarrative: string,
+  input: ComicStoryboardInput,
   styleKey: string,
 ): Promise<ComicPanelPrompt[]> {
   if (env.aiMock || !env.deepseekApiKey) {
-    return mockComicPrompts(refinedNarrative, styleKey);
+    return mockComicPrompts(input, styleKey);
   }
 
   const styleHint =
@@ -82,23 +108,33 @@ export async function generateComicPanelPrompts(
       ? '霓虹超现实拼贴风格，高饱和，梦幻'
       : '高对比黑白漫画，颗粒感，粗线条';
 
+  const tagLine =
+    input.tags.length > 0
+      ? input.tags.map((t) => `${t.name}(${t.category})`).join('、')
+      : '（无标签）';
+
+  const modeHint =
+    input.mode === 'imagery'
+      ? '本次为「意象四格」模式：围绕用户梦中最核心的 1–2 个意象，用 4 个不同镜头表现，不要编造新剧情。'
+      : '本次为「叙事四格」模式：在用户已有情节基础上做起承转合，不得添加原文没有的事件。';
+
   const response = await getClient().chat.completions.create({
     model: env.deepseekModel,
     messages: [
-      {
-        role: 'system',
-        content:
-          '为四格梦境漫画生成分镜。每一格都是一张独立的「16:9 横版整幅电影感画面」：单一场景、单一镜头，横向铺满画面；' +
-          '不要画分镜格线/边框/留白/多格拼贴，不要任何文字、字母或对话气泡；主体置于画面中部并留出安全边距，避免被左右边缘裁切。' +
-          '输出 JSON：{ "panels": [ { "panelIndex": 1-4, "caption": "中文短句", "seedreamPrompt": "英文或中文绘画 prompt，<=500字，需在其中点明 16:9 横版全幅、单一场景、无边框无文字" } ] }',
-      },
+      { role: 'system', content: COMIC_STORYBOARD_SYSTEM },
       {
         role: 'user',
-        content: `梦境文本：\n${refinedNarrative}\n\n视觉风格：${styleHint}\n生成 4 个连续分镜，每格为独立的 16:9 横版全幅单场景画面（非拼贴、非多格、无文字）。`,
+        content:
+          `${modeHint}\n\n` +
+          `梦境整理正文：\n${input.refinedNarrative}\n\n` +
+          `梦境口述原文：\n${input.rawTranscript || input.refinedNarrative}\n\n` +
+          `意象标签：${tagLine}\n\n` +
+          `视觉风格：${styleHint}\n` +
+          `生成 4 个分镜，每格为独立 16:9 横版全幅单场景画面。`,
       },
     ],
     response_format: { type: 'json_object' },
-    temperature: 0.7,
+    temperature: 0.4,
   });
 
   const text = response.choices[0]?.message?.content || '{}';
@@ -109,7 +145,7 @@ export async function generateComicPanelPrompts(
   } catch {
     /* fallback */
   }
-  return mockComicPrompts(refinedNarrative, styleKey);
+  return mockComicPrompts(input, styleKey);
 }
 
 function parseAnalysisJson(text: string, fallbackRaw: string): DreamAnalysisResult {
@@ -203,13 +239,18 @@ function mockReinterpret(narrative: string, mode: ReinterpretMode): ReinterpretR
   return { analysisText: base, riskFlag: false };
 }
 
-function mockComicPrompts(narrative: string, styleKey: string): ComicPanelPrompt[] {
+function mockComicPrompts(input: ComicStoryboardInput, styleKey: string): ComicPanelPrompt[] {
   const style =
     styleKey === 'neon-surreal' ? 'neon surreal dreamscape' : 'noir comic high contrast';
-  const snippet = narrative.slice(0, 40);
+  const snippet = (input.refinedNarrative || input.rawTranscript).slice(0, 40);
+  const sources: ComicPanelSource[] =
+    input.mode === 'imagery'
+      ? ['verbatim', 'atmosphere', 'atmosphere', 'atmosphere']
+      : ['verbatim', 'atmosphere', 'atmosphere', 'inferred'];
   return [1, 2, 3, 4].map((i) => ({
     panelIndex: i,
     caption: `第${i}格 · ${snippet}`,
     seedreamPrompt: `${style}, single full-frame cinematic scene, 16:9 horizontal composition, dream comic panel ${i}, ${snippet}, no panel borders, no grid, no text, subject centered with safe margins`,
+    source: sources[i - 1],
   }));
 }

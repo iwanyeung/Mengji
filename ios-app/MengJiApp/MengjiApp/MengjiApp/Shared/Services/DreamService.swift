@@ -37,6 +37,7 @@ struct ServerDreamDetail: Decodable {
     let tags: [ServerTag]?
     let feedback: ServerFeedback?
     let visuals: [ServerVisual]?
+    let comicReadiness: ComicReadiness?
 
     struct ServerTag: Decodable {
         let name: String
@@ -252,6 +253,37 @@ struct DreamService {
             "POST",
             path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-storyboard/prefetch",
             body: Body(styleKey: styleKey)
+        )
+    }
+
+    func fetchComicReadiness(dreamId: UUID) async throws -> ComicReadiness {
+        try await APIClient.shared.request(
+            "GET",
+            path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-readiness"
+        )
+    }
+
+    func fetchComicStoryboard(dreamId: UUID, styleKey: String) async throws -> ComicStoryboardPreview {
+        try await APIClient.shared.request(
+            "GET",
+            path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-storyboard?styleKey=\(styleKey)"
+        )
+    }
+
+    func updateComicStoryboard(
+        dreamId: UUID,
+        styleKey: String,
+        panels: [ComicStoryboardCaptionUpdate]
+    ) async throws {
+        struct Body: Encodable {
+            let styleKey: String
+            let panels: [ComicStoryboardCaptionUpdate]
+        }
+        struct Resp: Decodable { let ok: Bool }
+        let _: Resp = try await APIClient.shared.request(
+            "PUT",
+            path: "api/dreams/\(dreamId.uuidString.lowercased())/comic-storyboard",
+            body: Body(styleKey: styleKey, panels: panels)
         )
     }
 

@@ -24,6 +24,7 @@ struct InsightView: View {
     @State private var showOrganizedSaveSheet = false
     @State private var feedbackOptionalNote = ""
     @State private var pendingOrganizedDraft = ""
+    @State private var comicReadiness: ComicReadiness?
 
     init(dreamId: UUID? = nil, appState: AppState) {
         self.dreamId = dreamId
@@ -51,6 +52,7 @@ struct InsightView: View {
                         aBitOffContinueBar
                     }
                     comicSection
+                    comicReadinessSection
                     feedbackSection
                     disclaimerSection
                     Spacer(minLength: 40)
@@ -87,7 +89,10 @@ struct InsightView: View {
                 openLatestComicIfAvailable()
                 appState.clearPendingComicOpenFlag()
             }
-            Task { await viewModel.refreshFromServer() }
+            Task {
+                await viewModel.refreshFromServer()
+                await loadComicReadiness()
+            }
         }
         .appToastOverlay(
             message: $viewModel.toastMessage,
@@ -534,6 +539,13 @@ struct InsightView: View {
         )
     }
 
+    @ViewBuilder
+    private var comicReadinessSection: some View {
+        if let comicReadiness, !hasComicForCurrentDream {
+            ComicReadinessBanner(readiness: comicReadiness)
+        }
+    }
+
     private var bottomCTA: some View {
         VStack(spacing: 10) {
             Button {
@@ -545,7 +557,7 @@ struct InsightView: View {
                 }
             } label: {
                 HStack {
-                    Text(hasComicForCurrentDream ? "重新落成四格故事" : "让这条梦落成四格故事")
+                    Text(workshopCTATitle)
                     Spacer()
                     Image(systemName: "sparkles")
                 }
@@ -782,6 +794,26 @@ struct InsightView: View {
     private var currentDream: Dream? {
         let id = dreamId ?? viewModel.current.id
         return dreamStore.dream(id: id)
+    }
+
+    private var workshopCTATitle: String {
+        if hasComicForCurrentDream {
+            return "重新落成四格故事"
+        }
+        if let comicReadiness {
+            return comicReadiness.ctaHint
+        }
+        return "让这条梦落成四格故事"
+    }
+
+    private func loadComicReadiness() async {
+        guard let dreamId else { return }
+        do {
+            try await AuthService.shared.ensureAnonymousSession()
+            comicReadiness = try await DreamService.shared.fetchComicReadiness(dreamId: dreamId)
+        } catch {
+            comicReadiness = nil
+        }
     }
 
     private var hasComicForCurrentDream: Bool {

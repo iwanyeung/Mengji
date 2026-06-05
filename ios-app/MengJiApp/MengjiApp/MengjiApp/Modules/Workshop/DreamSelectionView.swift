@@ -28,13 +28,20 @@ struct DreamSelectionView: View {
                                         .font(AppTheme.bodyFont(size: 12))
                                         .foregroundColor(AppTheme.muted)
                                         .lineLimit(2)
+
+                                    if dream.hasComic {
+                                        comicManifestedLabel(for: dream)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                                if dream.id == selectedId {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AppTheme.primaryColor)
+                                HStack(spacing: 10) {
+                                    if dream.id == selectedId {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(AppTheme.primaryColor)
+                                    }
                                 }
+                                .frame(minWidth: 20, alignment: .trailing)
                             }
                             .padding(.vertical, 6)
                         }
@@ -87,6 +94,24 @@ struct DreamSelectionView: View {
         if trimmed.count <= limit { return trimmed }
         let idx = trimmed.index(trimmed.startIndex, offsetBy: limit)
         return String(trimmed[..<idx]) + "…"
+    }
+
+    @ViewBuilder
+    private func comicManifestedLabel(for dream: Dream) -> some View {
+        HStack(spacing: 6) {
+            Text("已落成")
+                .font(AppTheme.capsFont(size: 11, weight: .semibold))
+                .foregroundColor(AppTheme.background)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(AppTheme.primaryColor)
+
+            if dream.comicArtifacts.count > 1 {
+                Text("共 \(dream.comicArtifacts.count) 版")
+                    .font(AppTheme.bodyFont(size: 11))
+                    .foregroundColor(AppTheme.muted)
+            }
+        }
     }
 }
 
